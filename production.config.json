@@ -1,0 +1,45 @@
+{
+  "APP_NAME": "Database Statistics Dashboard",
+  "VERSION": "1.0.0",
+  "ENVIRONMENT": "production",
+  "DEBUG": false,
+  "APP_PORT": 8080,
+  
+  "VALKEY_HOST": "10.0.0.4",
+  "VALKEY_PORT": 6379,
+  "VALKEY_DB": 0,
+  "VALKEY_CONNECTION_TIMEOUT": 5,
+  "VALKEY_SOCKET_TIMEOUT": 5,
+  
+  "POSTGRES_HOST": "10.0.0.3",
+  "POSTGRES_PORT": 5432,
+  "POSTGRES_DATABASE": "webapp_db",
+  "POSTGRES_USER": "webapp_user",
+  "POSTGRES_CONNECTION_TIMEOUT": 10,
+  
+  "LOGGING": {
+    "LEVEL": "INFO",
+    "FORMAT": "json",
+    "FILE": "/app/logs/app.log",
+    "MAX_SIZE": "10MB",
+    "BACKUP_COUNT": 5
+  },
+  
+  "SECURITY": {
+    "SECRET_KEY": "replace-with-secure-random-key-in-production",
+    "SESSION_TIMEOUT": 3600,
+    "RATE_LIMIT_ENABLED": true,
+    "RATE_LIMIT_PER_MINUTE": 60
+  },
+  
+  "MONITORING": {
+    "HEALTH_CHECK_ENABLED": true,
+    "METRICS_ENABLED": true,
+    "ALERT_EMAIL": "admin@yourdomain.com"
+  },
+  
+  "CACHE": {
+    "STATS_TTL": 30,
+    "CONNECTION_POOL_SIZE": 10
+  }
+}

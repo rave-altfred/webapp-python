@@ -1,0 +1,101 @@
+version: '3.8'
+
+services:
+  webapp:
+    image: registry.digitalocean.com/altfred-registry/webapp-python:latest
+    container_name: webapp-python
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    environment:
+      # Flask configuration
+      - FLASK_ENV=production
+      - DEBUG=false
+      - APP_PORT=8080
+      
+      # Database connections - these will be set from environment file
+      - VALKEY_HOST=${VALKEY_HOST}
+      - VALKEY_PORT=${VALKEY_PORT:-6379}
+      - VALKEY_PASSWORD=${VALKEY_PASSWORD}
+      - VALKEY_DB=${VALKEY_DB:-0}
+      
+      - POSTGRES_HOST=${POSTGRES_HOST}
+      - POSTGRES_PORT=${POSTGRES_PORT:-5432}
+      - POSTGRES_DATABASE=${POSTGRES_DATABASE}
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      
+      # Configuration file
+      - CONFIG_FILE=/app/production.config.json
+      
+    volumes:
+      # Mount configuration file
+      - ./production.config.json:/app/production.config.json:ro
+      # Mount logs directory
+      - ./logs:/app/logs
+    
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+    
+    # Security settings
+    security_opt:
+      - no-new-privileges:true
+    
+    # Resource limits
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 512M
+        reservations:
+          cpus: '0.25'
+          memory: 128M
+    
+    # Network configuration
+    networks:
+      - webapp-network
+
+  # Reverse proxy with Caddy
+  caddy:
+    image: caddy:2.7-alpine
+    container_name: webapp-caddy
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    environment:
+      - DOMAIN_NAME=${DOMAIN_NAME}
+    depends_on:
+      - webapp
+    networks:
+      - webapp-network
+    
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+networks:
+  webapp-network:
+    driver: bridge
+
+volumes:
+  caddy_data:
+    external: false
+  caddy_config:
+    external: false

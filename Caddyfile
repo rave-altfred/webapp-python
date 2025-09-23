@@ -1,0 +1,136 @@
+# Caddyfile for Database Statistics Dashboard
+# Provides reverse proxy with automatic HTTPS via Let's Encrypt
+
+# Replace with your actual domain name
+{$DOMAIN_NAME:localhost} {
+    # Reverse proxy to the Flask app
+    reverse_proxy webapp:8080 {
+        # Health check
+        health_uri /health
+        health_interval 30s
+        health_timeout 5s
+        
+        # Headers for better security and performance
+        header_up Host {host}
+        header_up X-Real-IP {remote_host}
+        header_up X-Forwarded-For {remote_host}
+        header_up X-Forwarded-Proto {scheme}
+    }
+    
+    # Enable compression
+    encode gzip zstd
+    
+    # Security headers
+    header {
+        # Hide server information
+        -Server
+        
+        # Security headers
+        X-Content-Type-Options nosniff
+        X-Frame-Options DENY
+        X-XSS-Protection "1; mode=block"
+        Referrer-Policy strict-origin-when-cross-origin
+        
+        # HSTS (HTTP Strict Transport Security)
+        Strict-Transport-Security "max-age=31536000; includeSubDomains; preload"
+        
+        # Content Security Policy
+        Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self'"
+    }
+    
+    # Rate limiting (adjust as needed)
+    rate_limit {
+        zone webapp {
+            key {remote_host}
+            window 1m
+            events 60
+        }
+    }
+    
+    # Access logging
+    log {
+        output file /var/log/caddy/access.log {
+            roll_size 10MiB
+            roll_keep 10
+        }
+        format json
+        level INFO
+    }
+    
+    # Error logging
+    log {
+        output file /var/log/caddy/error.log {
+            roll_size 10MiB
+            roll_keep 10
+        }
+        level ERROR
+    }
+}
+
+# HTTP to HTTPS redirect (automatic with Caddy when using domain names)
+# If you need to handle plain HTTP explicitly:
+http://{$DOMAIN_NAME} {
+    redir https://{host}{uri} permanent
+}
+
+# Health check endpoint accessible without domain (for load balancers)
+:8081 {
+    respond /health "OK" 200
+    
+    # Basic metrics endpoint
+    handle /metrics {
+        reverse_proxy webapp:8080/health
+    }
+    
+    # Block all other requests
+    handle * {
+        respond "Not Found" 404
+    }
+}
+
+# Admin interface (optional, for monitoring)
+admin.{$DOMAIN_NAME:admin.localhost} {
+    # Basic auth (replace with your credentials)
+    basicauth {
+        admin $2a$14$example_hash_replace_with_real_hash
+    }
+    
+    # Proxy to application admin endpoints if available
+    handle /admin* {
+        reverse_proxy webapp:8080
+    }
+    
+    # Caddy admin API (be careful with this in production)
+    handle /caddy* {
+        reverse_proxy localhost:2019
+    }
+    
+    # Default response
+    handle {
+        respond "Admin Interface" 200
+    }
+}
+
+# Global options
+{
+    # Email for Let's Encrypt (replace with your email)
+    email admin@yourdomain.com
+    
+    # Automatic HTTPS
+    auto_https on
+    
+    # Enable HTTP/2
+    servers {
+        protocol {
+            allow_h2c
+        }
+    }
+    
+    # Security options
+    order rate_limit before basicauth
+    
+    # Admin API settings
+    admin localhost:2019 {
+        origins localhost 127.0.0.1
+    }
+}

@@ -1,0 +1,468 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Database Statistics Dashboard</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+            color: #333;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 40px;
+        }
+
+        .header h1 {
+            color: white;
+            font-size: 2.5rem;
+            margin-bottom: 10px;
+            text-shadow: 0 2px 4px rgba(0,0,0,0.3);
+        }
+
+        .header p {
+            color: rgba(255, 255, 255, 0.8);
+            font-size: 1.1rem;
+        }
+
+        .refresh-btn {
+            background: rgba(255, 255, 255, 0.2);
+            color: white;
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            padding: 10px 20px;
+            border-radius: 25px;
+            cursor: pointer;
+            font-size: 16px;
+            margin-top: 20px;
+            transition: all 0.3s ease;
+        }
+
+        .refresh-btn:hover {
+            background: rgba(255, 255, 255, 0.3);
+            transform: translateY(-2px);
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(600px, 1fr));
+            gap: 30px;
+            margin-bottom: 30px;
+        }
+
+        .stats-card {
+            background: white;
+            border-radius: 15px;
+            padding: 30px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+        }
+
+        .stats-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 15px 40px rgba(0, 0, 0, 0.15);
+        }
+
+        .card-header {
+            display: flex;
+            align-items: center;
+            margin-bottom: 25px;
+            padding-bottom: 15px;
+            border-bottom: 2px solid #f0f0f0;
+        }
+
+        .card-icon {
+            width: 50px;
+            height: 50px;
+            margin-right: 15px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 12px;
+            font-size: 24px;
+        }
+
+        .valkey-icon {
+            background: linear-gradient(135deg, #ff6b6b, #ee5a52);
+            color: white;
+        }
+
+        .postgres-icon {
+            background: linear-gradient(135deg, #336791, #2d5886);
+            color: white;
+        }
+
+        .card-title {
+            font-size: 1.5rem;
+            font-weight: 600;
+            color: #2c3e50;
+        }
+
+        .status-indicator {
+            margin-left: auto;
+            padding: 5px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 600;
+            text-transform: uppercase;
+        }
+
+        .status-connected {
+            background: #d4edda;
+            color: #155724;
+        }
+
+        .status-error {
+            background: #f8d7da;
+            color: #721c24;
+        }
+
+        .stat-item {
+            margin-bottom: 15px;
+            padding: 12px;
+            background: #f8f9fa;
+            border-radius: 8px;
+            border-left: 4px solid #007bff;
+        }
+
+        .stat-label {
+            font-weight: 600;
+            color: #495057;
+            display: block;
+            margin-bottom: 5px;
+        }
+
+        .stat-value {
+            font-size: 1.1rem;
+            color: #2c3e50;
+            font-weight: 500;
+        }
+
+        .stat-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+
+        .loading {
+            text-align: center;
+            color: #666;
+            font-style: italic;
+        }
+
+        .error-message {
+            background: #f8d7da;
+            color: #721c24;
+            padding: 15px;
+            border-radius: 8px;
+            border-left: 4px solid #dc3545;
+            margin-bottom: 15px;
+        }
+
+        .table-stats {
+            overflow-x: auto;
+            margin-top: 20px;
+        }
+
+        .table-stats table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 14px;
+        }
+
+        .table-stats th, .table-stats td {
+            padding: 8px 12px;
+            text-align: left;
+            border-bottom: 1px solid #dee2e6;
+        }
+
+        .table-stats th {
+            background: #f8f9fa;
+            font-weight: 600;
+            color: #495057;
+        }
+
+        .highlight-metric {
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            color: white;
+            border-left: 4px solid #fff;
+        }
+
+        .last-updated {
+            text-align: center;
+            color: rgba(255, 255, 255, 0.8);
+            font-size: 14px;
+            margin-top: 30px;
+        }
+
+        @media (max-width: 768px) {
+            .stats-grid {
+                grid-template-columns: 1fr;
+            }
+            
+            .stat-grid {
+                grid-template-columns: 1fr;
+            }
+            
+            .header h1 {
+                font-size: 2rem;
+            }
+            
+            body {
+                padding: 10px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>Database Statistics Dashboard</h1>
+            <p>Real-time monitoring of Valkey and PostgreSQL databases</p>
+            <button class="refresh-btn" onclick="refreshData()">🔄 Refresh Data</button>
+        </div>
+
+        <div class="stats-grid">
+            <!-- Valkey Statistics -->
+            <div class="stats-card">
+                <div class="card-header">
+                    <div class="card-icon valkey-icon">🗄️</div>
+                    <h2 class="card-title">Valkey Database</h2>
+                    <span id="valkey-status" class="status-indicator">...</span>
+                </div>
+                <div id="valkey-stats" class="loading">Loading Valkey statistics...</div>
+            </div>
+
+            <!-- PostgreSQL Statistics -->
+            <div class="stats-card">
+                <div class="card-header">
+                    <div class="card-icon postgres-icon">🐘</div>
+                    <h2 class="card-title">PostgreSQL Database</h2>
+                    <span id="postgres-status" class="status-indicator">...</span>
+                </div>
+                <div id="postgres-stats" class="loading">Loading PostgreSQL statistics...</div>
+            </div>
+        </div>
+
+        <div class="last-updated" id="last-updated"></div>
+    </div>
+
+    <script>
+        function formatBytes(bytes) {
+            if (!bytes || bytes === 0) return '0 B';
+            const k = 1024;
+            const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
+            const i = Math.floor(Math.log(bytes) / Math.log(k));
+            return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+        }
+
+        function formatNumber(num) {
+            if (!num && num !== 0) return 'N/A';
+            return new Intl.NumberFormat().format(num);
+        }
+
+        function formatUptime(seconds) {
+            if (!seconds) return 'N/A';
+            const days = Math.floor(seconds / 86400);
+            const hours = Math.floor((seconds % 86400) / 3600);
+            const minutes = Math.floor((seconds % 3600) / 60);
+            return `${days}d ${hours}h ${minutes}m`;
+        }
+
+        function renderValkeyStats(data) {
+            const container = document.getElementById('valkey-stats');
+            const status = document.getElementById('valkey-status');
+            
+            if (data.error) {
+                container.innerHTML = `<div class="error-message">❌ ${data.error}</div>`;
+                status.textContent = 'ERROR';
+                status.className = 'status-indicator status-error';
+                return;
+            }
+
+            status.textContent = 'CONNECTED';
+            status.className = 'status-indicator status-connected';
+
+            container.innerHTML = `
+                <div class="stat-grid">
+                    <div class="stat-item highlight-metric">
+                        <span class="stat-label">Database Size</span>
+                        <span class="stat-value">${formatNumber(data.database_size)} keys</span>
+                    </div>
+                    <div class="stat-item highlight-metric">
+                        <span class="stat-label">Hit Ratio</span>
+                        <span class="stat-value">${data.hit_ratio}%</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-label">Memory Usage</span>
+                        <span class="stat-value">${data.memory.used_memory_human || 'N/A'}</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-label">Peak Memory</span>
+                        <span class="stat-value">${data.memory.used_memory_peak_human || 'N/A'}</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-label">Connected Clients</span>
+                        <span class="stat-value">${formatNumber(data.connected_clients)}</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-label">Uptime</span>
+                        <span class="stat-value">${formatUptime(data.server.uptime_in_seconds)}</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-label">Total Connections</span>
+                        <span class="stat-value">${formatNumber(data.stats.total_connections_received)}</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-label">Commands Processed</span>
+                        <span class="stat-value">${formatNumber(data.stats.total_commands_processed)}</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-label">Ops/sec</span>
+                        <span class="stat-value">${formatNumber(data.stats.instantaneous_ops_per_sec)}</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-label">Server Version</span>
+                        <span class="stat-value">${data.server.redis_version || 'N/A'}</span>
+                    </div>
+                </div>
+            `;
+        }
+
+        function renderPostgresStats(data) {
+            const container = document.getElementById('postgres-stats');
+            const status = document.getElementById('postgres-status');
+            
+            if (data.error) {
+                container.innerHTML = `<div class="error-message">❌ ${data.error}</div>`;
+                status.textContent = 'ERROR';
+                status.className = 'status-indicator status-error';
+                return;
+            }
+
+            status.textContent = 'CONNECTED';
+            status.className = 'status-indicator status-connected';
+
+            let tablesHtml = '';
+            if (data.tables && data.tables.length > 0) {
+                tablesHtml = `
+                    <div class="table-stats">
+                        <h4>Table Statistics</h4>
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Table</th>
+                                    <th>Live Tuples</th>
+                                    <th>Inserts</th>
+                                    <th>Updates</th>
+                                    <th>Deletes</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                ${data.tables.slice(0, 10).map(table => `
+                                    <tr>
+                                        <td>${table.tablename}</td>
+                                        <td>${formatNumber(table.live_tuples)}</td>
+                                        <td>${formatNumber(table.inserts)}</td>
+                                        <td>${formatNumber(table.updates)}</td>
+                                        <td>${formatNumber(table.deletes)}</td>
+                                    </tr>
+                                `).join('')}
+                            </tbody>
+                        </table>
+                    </div>
+                `;
+            }
+
+            container.innerHTML = `
+                <div class="stat-grid">
+                    <div class="stat-item highlight-metric">
+                        <span class="stat-label">Database Size</span>
+                        <span class="stat-value">${data.database_size || 'N/A'}</span>
+                    </div>
+                    <div class="stat-item highlight-metric">
+                        <span class="stat-label">Cache Hit Ratio</span>
+                        <span class="stat-value">${data.cache_hit_ratio}%</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-label">Total Connections</span>
+                        <span class="stat-value">${formatNumber(data.connections.total_connections)}</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-label">Active Connections</span>
+                        <span class="stat-value">${formatNumber(data.connections.active_connections)}</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-label">Committed Transactions</span>
+                        <span class="stat-value">${formatNumber(data.activity.committed_transactions)}</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-label">Rolled Back Transactions</span>
+                        <span class="stat-value">${formatNumber(data.activity.rolled_back_transactions)}</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-label">Tuples Inserted</span>
+                        <span class="stat-value">${formatNumber(data.activity.tuples_inserted)}</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-label">Tuples Updated</span>
+                        <span class="stat-value">${formatNumber(data.activity.tuples_updated)}</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-label">Tuples Deleted</span>
+                        <span class="stat-value">${formatNumber(data.activity.tuples_deleted)}</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-label">Recent Activities (24h)</span>
+                        <span class="stat-value">${formatNumber(data.recent_activities)}</span>
+                    </div>
+                </div>
+                ${tablesHtml}
+            `;
+        }
+
+        function refreshData() {
+            document.getElementById('valkey-stats').innerHTML = '<div class="loading">Loading Valkey statistics...</div>';
+            document.getElementById('postgres-stats').innerHTML = '<div class="loading">Loading PostgreSQL statistics...</div>';
+            
+            fetch('/api/stats')
+                .then(response => response.json())
+                .then(data => {
+                    renderValkeyStats(data.valkey);
+                    renderPostgresStats(data.postgres);
+                    document.getElementById('last-updated').textContent = 
+                        `Last updated: ${new Date(data.timestamp).toLocaleString()}`;
+                })
+                .catch(error => {
+                    console.error('Error fetching stats:', error);
+                    document.getElementById('valkey-stats').innerHTML = 
+                        '<div class="error-message">❌ Error loading Valkey statistics</div>';
+                    document.getElementById('postgres-stats').innerHTML = 
+                        '<div class="error-message">❌ Error loading PostgreSQL statistics</div>';
+                });
+        }
+
+        // Load data on page load
+        refreshData();
+
+        // Auto-refresh every 30 seconds
+        setInterval(refreshData, 30000);
+    </script>
+</body>
+</html>
