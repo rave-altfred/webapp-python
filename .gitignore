@@ -171,9 +171,15 @@ Temporary Items
 .apdisk
 
 # Digital Ocean specific
-.env.local
 .env.production
 config/secrets.json
+
+# Local development
+.env.local
+venv/
+*.pyc
+__pycache__/
+.pytest_cache/
 
 # Log files
 logs/

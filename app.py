@@ -27,6 +27,7 @@ def load_config():
     config = {
         'VALKEY_HOST': os.getenv('VALKEY_HOST', 'localhost'),
         'VALKEY_PORT': int(os.getenv('VALKEY_PORT', 6379)),
+        'VALKEY_USER': os.getenv('VALKEY_USER'),
         'VALKEY_PASSWORD': os.getenv('VALKEY_PASSWORD'),
         'VALKEY_DB': int(os.getenv('VALKEY_DB', 0)),
         
@@ -58,15 +59,23 @@ config = load_config()
 def get_valkey_connection():
     """Get Valkey (Redis-compatible) connection."""
     try:
-        client = redis.Redis(
-            host=config['VALKEY_HOST'],
-            port=config['VALKEY_PORT'],
-            password=config['VALKEY_PASSWORD'],
-            db=config['VALKEY_DB'],
-            decode_responses=True,
-            socket_connect_timeout=5,
-            socket_timeout=5
-        )
+        # Connection parameters
+        conn_params = {
+            'host': config['VALKEY_HOST'],
+            'port': config['VALKEY_PORT'],
+            'db': config['VALKEY_DB'],
+            'decode_responses': True,
+            'socket_connect_timeout': 5,
+            'socket_timeout': 5
+        }
+        
+        # Add authentication
+        if config['VALKEY_USER']:
+            conn_params['username'] = config['VALKEY_USER']
+        if config['VALKEY_PASSWORD']:
+            conn_params['password'] = config['VALKEY_PASSWORD']
+            
+        client = redis.Redis(**conn_params)
         # Test connection
         client.ping()
         return client
@@ -77,14 +86,21 @@ def get_valkey_connection():
 def get_postgres_connection():
     """Get PostgreSQL connection."""
     try:
-        conn = psycopg2.connect(
-            host=config['POSTGRES_HOST'],
-            port=config['POSTGRES_PORT'],
-            database=config['POSTGRES_DATABASE'],
-            user=config['POSTGRES_USER'],
-            password=config['POSTGRES_PASSWORD'],
-            connect_timeout=10
-        )
+        # Connection parameters
+        conn_params = {
+            'host': config['POSTGRES_HOST'],
+            'port': config['POSTGRES_PORT'],
+            'database': config['POSTGRES_DATABASE'],
+            'user': config['POSTGRES_USER'],
+            'password': config['POSTGRES_PASSWORD'],
+            'connect_timeout': 10
+        }
+        
+        # Add SSL configuration for managed databases
+        if 'ondigitalocean.com' in config['POSTGRES_HOST'] or os.getenv('POSTGRES_SSLMODE'):
+            conn_params['sslmode'] = os.getenv('POSTGRES_SSLMODE', 'require')
+            
+        conn = psycopg2.connect(**conn_params)
         return conn
     except Exception as e:
         logger.error(f"Error connecting to PostgreSQL: {e}")
