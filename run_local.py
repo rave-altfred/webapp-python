@@ -66,6 +66,12 @@ def test_database_connections():
             'socket_timeout': 2
         }
         
+        # Add SSL for DigitalOcean managed databases
+        valkey_host = os.getenv('VALKEY_HOST', 'localhost')
+        if 'ondigitalocean.com' in valkey_host:
+            conn_params['ssl'] = True
+            conn_params['ssl_cert_reqs'] = None  # Don't verify SSL certificates for managed DB
+        
         # Add authentication
         if os.getenv('VALKEY_USER'):
             conn_params['username'] = os.getenv('VALKEY_USER')

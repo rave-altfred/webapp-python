@@ -69,6 +69,11 @@ def get_valkey_connection():
             'socket_timeout': 5
         }
         
+        # Add SSL for DigitalOcean managed databases
+        if 'ondigitalocean.com' in config['VALKEY_HOST']:
+            conn_params['ssl'] = True
+            conn_params['ssl_cert_reqs'] = None  # Don't verify SSL certificates for managed DB
+        
         # Add authentication
         if config['VALKEY_USER']:
             conn_params['username'] = config['VALKEY_USER']
