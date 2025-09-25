@@ -16,7 +16,10 @@ from flask import Flask, render_template, jsonify, request
 import requests
 
 # Configure logging
-logging.basicConfig(level=logging.INFO)
+logging.basicConfig(
+    level=logging.DEBUG,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
 logger = logging.getLogger(__name__)
 
 app = Flask(__name__)
@@ -58,6 +61,7 @@ config = load_config()
 # Database connections
 def get_valkey_connection():
     """Get Valkey (Redis-compatible) connection."""
+    logger.info(f"Attempting Valkey connection to {config['VALKEY_HOST']}:{config['VALKEY_PORT']}")
     try:
         # Connection parameters
         conn_params = {
@@ -71,25 +75,32 @@ def get_valkey_connection():
         
         # Add SSL for DigitalOcean managed databases
         if 'ondigitalocean.com' in config['VALKEY_HOST']:
+            logger.info("Adding SSL configuration for DigitalOcean managed Valkey")
             conn_params['ssl'] = True
             conn_params['ssl_cert_reqs'] = None  # Don't verify SSL certificates for managed DB
         
         # Add authentication
         if config['VALKEY_USER']:
+            logger.info(f"Using Valkey username: {config['VALKEY_USER']}")
             conn_params['username'] = config['VALKEY_USER']
         if config['VALKEY_PASSWORD']:
+            logger.info("Valkey password provided")
             conn_params['password'] = config['VALKEY_PASSWORD']
             
+        logger.info("Creating Redis client...")
         client = redis.Redis(**conn_params)
-        # Test connection
+        
+        logger.info("Testing connection with ping...")
         client.ping()
+        logger.info("✅ Valkey connection successful!")
         return client
     except Exception as e:
-        logger.error(f"Error connecting to Valkey: {e}")
+        logger.error(f"❌ Error connecting to Valkey: {e}")
         return None
 
 def get_postgres_connection():
     """Get PostgreSQL connection."""
+    logger.info(f"Attempting PostgreSQL connection to {config['POSTGRES_HOST']}:{config['POSTGRES_PORT']}")
     try:
         # Connection parameters
         conn_params = {
@@ -105,20 +116,29 @@ def get_postgres_connection():
         if 'ondigitalocean.com' in config['POSTGRES_HOST'] or os.getenv('POSTGRES_SSLMODE'):
             conn_params['sslmode'] = os.getenv('POSTGRES_SSLMODE', 'require')
             
+        logger.info("Creating PostgreSQL connection...")
         conn = psycopg2.connect(**conn_params)
+        logger.info("✅ PostgreSQL connection successful!")
         return conn
     except Exception as e:
-        logger.error(f"Error connecting to PostgreSQL: {e}")
+        logger.error(f"❌ Error connecting to PostgreSQL: {e}")
         return None
 
-def get_valkey_stats() -> Dict[str, Any]:
-    """Get Valkey database statistics."""
-    client = get_valkey_connection()
-    if not client:
+def get_postgres_stats() -> Dict[str, Any]:
+    """Get PostgreSQL database statistics."""
+    logger.info("🐘 Starting get_postgres_stats()")
+    conn = get_postgres_connection()
+    if not conn:
+        logger.error("❌ Failed to get PostgreSQL connection in get_postgres_stats()")
+        return {'error': 'Cannot connect to PostgreSQL database'}
+        logger.error("❌ Failed to get Valkey client in get_valkey_stats()")
         return {'error': 'Cannot connect to Valkey database'}
     
     try:
+        logger.info("Getting Valkey info()...")
         info = client.info()
+        logger.info(f"Received info with {len(info)} keys")
+        
         stats = {
             'server': {
                 'redis_version': info.get('redis_version'),
@@ -163,11 +183,14 @@ def get_valkey_stats() -> Dict[str, Any]:
         else:
             stats['hit_ratio'] = 0
             
+        logger.info("✅ Successfully gathered Valkey statistics")
         client.close()
         return stats
         
     except Exception as e:
-        logger.error(f"Error getting Valkey stats: {e}")
+        logger.error(f"❌ Error getting Valkey stats: {e}")
+        if client:
+            client.close()
         return {'error': f'Error retrieving Valkey statistics: {str(e)}'}
 
 def get_postgres_stats() -> Dict[str, Any]:
@@ -193,7 +216,7 @@ def get_postgres_stats() -> Dict[str, Any]:
         cursor.execute("""
             SELECT 
                 schemaname,
-                tablename,
+                relname as tablename,
                 n_tup_ins as inserts,
                 n_tup_upd as updates,
                 n_tup_del as deletes,
@@ -291,7 +314,14 @@ def api_stats():
 @app.route('/api/valkey')
 def api_valkey():
     """API endpoint to get Valkey statistics."""
-    return jsonify(get_valkey_stats())
+    logger.info("🌐 API /api/valkey endpoint called")
+    try:
+        stats = get_valkey_stats()
+        logger.info(f"📋 Returning Valkey stats: {len(str(stats))} characters")
+        return jsonify(stats)
+    except Exception as e:
+        logger.error(f"❌ Error in /api/valkey endpoint: {e}")
+        return jsonify({'error': f'API error: {str(e)}'}), 500
 
 @app.route('/api/postgres')
 def api_postgres():
