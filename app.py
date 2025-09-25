@@ -124,13 +124,11 @@ def get_postgres_connection():
         logger.error(f"❌ Error connecting to PostgreSQL: {e}")
         return None
 
-def get_postgres_stats() -> Dict[str, Any]:
-    """Get PostgreSQL database statistics."""
-    logger.info("🐘 Starting get_postgres_stats()")
-    conn = get_postgres_connection()
-    if not conn:
-        logger.error("❌ Failed to get PostgreSQL connection in get_postgres_stats()")
-        return {'error': 'Cannot connect to PostgreSQL database'}
+def get_valkey_stats() -> Dict[str, Any]:
+    """Get Valkey database statistics."""
+    logger.info("📊 Starting get_valkey_stats()")
+    client = get_valkey_connection()
+    if not client:
         logger.error("❌ Failed to get Valkey client in get_valkey_stats()")
         return {'error': 'Cannot connect to Valkey database'}
     
@@ -141,47 +139,147 @@ def get_postgres_stats() -> Dict[str, Any]:
         
         stats = {
             'server': {
-                'redis_version': info.get('redis_version'),
-                'uptime_in_seconds': info.get('uptime_in_seconds'),
-                'uptime_in_days': info.get('uptime_in_days'),
+                'redis_version': {
+                    'value': info.get('redis_version'),
+                    'description': 'Version of the Redis/Valkey server'
+                },
+                'uptime_in_seconds': {
+                    'value': info.get('uptime_in_seconds'),
+                    'description': 'Total time the server has been running (seconds)'
+                },
+                'uptime_in_days': {
+                    'value': info.get('uptime_in_days'),
+                    'description': 'Server uptime converted to days'
+                },
             },
             'memory': {
-                'used_memory': info.get('used_memory'),
-                'used_memory_human': info.get('used_memory_human'),
-                'used_memory_peak': info.get('used_memory_peak'),
-                'used_memory_peak_human': info.get('used_memory_peak_human'),
+                'used_memory': {
+                    'value': info.get('used_memory'),
+                    'description': 'Total bytes of memory used by Redis'
+                },
+                'used_memory_human': {
+                    'value': info.get('used_memory_human'),
+                    'description': 'Human readable memory usage (MB/GB)'
+                },
+                'used_memory_peak': {
+                    'value': info.get('used_memory_peak'),
+                    'description': 'Peak memory usage since server start (bytes)'
+                },
+                'used_memory_peak_human': {
+                    'value': info.get('used_memory_peak_human'),
+                    'description': 'Peak memory usage in human readable format'
+                },
             },
-            'stats': {
-                'total_connections_received': info.get('total_connections_received'),
-                'total_commands_processed': info.get('total_commands_processed'),
-                'instantaneous_ops_per_sec': info.get('instantaneous_ops_per_sec'),
-                'keyspace_hits': info.get('keyspace_hits'),
-                'keyspace_misses': info.get('keyspace_misses'),
+            'performance': {
+                'total_connections_received': {
+                    'value': info.get('total_connections_received'),
+                    'description': 'Total number of connections accepted by the server'
+                },
+                'total_commands_processed': {
+                    'value': info.get('total_commands_processed'),
+                    'description': 'Total number of commands processed by the server'
+                },
+                'instantaneous_ops_per_sec': {
+                    'value': info.get('instantaneous_ops_per_sec'),
+                    'description': 'Number of commands processed per second (current rate)'
+                },
+                'keyspace_hits': {
+                    'value': info.get('keyspace_hits'),
+                    'description': 'Number of successful key lookups'
+                },
+                'keyspace_misses': {
+                    'value': info.get('keyspace_misses'),
+                    'description': 'Number of failed key lookups'
+                },
             },
-            'keyspace': {},
-            'connected_clients': info.get('connected_clients'),
-            'blocked_clients': info.get('blocked_clients')
+            'clients': {
+                'connected_clients': {
+                    'value': info.get('connected_clients'),
+                    'description': 'Number of client connections (excluding replications)'
+                },
+                'blocked_clients': {
+                    'value': info.get('blocked_clients'),
+                    'description': 'Number of clients pending on a blocking call'
+                }
+            },
+            'keyspace': {}
         }
         
-        # Get keyspace information
+        # Get keyspace information with descriptions
+        logger.info("Getting keyspace information...")
         for key, value in info.items():
             if key.startswith('db'):
-                stats['keyspace'][key] = value
+                # Parse keyspace info (format: "keys=X,expires=Y,avg_ttl=Z")
+                keyspace_stats = {}
+                if isinstance(value, str):
+                    for item in value.split(','):
+                        if '=' in item:
+                            k, v = item.split('=', 1)
+                            try:
+                                keyspace_stats[k] = int(v)
+                            except ValueError:
+                                keyspace_stats[k] = v
+                                
+                stats['keyspace'][key] = {
+                    'raw_value': value,
+                    'parsed': keyspace_stats,
+                    'description': f'Database {key[2:]} statistics: keys, expiring keys, and average TTL'
+                }
         
         # Get database size
         try:
             db_size = client.dbsize()
-            stats['database_size'] = db_size
+            stats['database_size'] = {
+                'value': db_size,
+                'description': 'Total number of keys in the database'
+            }
         except:
-            stats['database_size'] = 0
+            stats['database_size'] = {
+                'value': 0,
+                'description': 'Total number of keys in the database'
+            }
             
         # Calculate hit ratio
-        hits = stats['stats']['keyspace_hits'] or 0
-        misses = stats['stats']['keyspace_misses'] or 0
+        hits = stats['performance']['keyspace_hits']['value'] or 0
+        misses = stats['performance']['keyspace_misses']['value'] or 0
         if hits + misses > 0:
-            stats['hit_ratio'] = round((hits / (hits + misses)) * 100, 2)
+            hit_ratio = round((hits / (hits + misses)) * 100, 2)
         else:
-            stats['hit_ratio'] = 0
+            hit_ratio = 0
+            
+        stats['cache_efficiency'] = {
+            'hit_ratio': {
+                'value': f"{hit_ratio}%",
+                'description': 'Percentage of successful key lookups vs total lookups'
+            }
+        }
+        
+        # Get queue information and process rates (disabled temporarily to fix hanging)
+        logger.info("Getting process rates (queue scanning disabled)...")
+        process_rate = stats['performance']['instantaneous_ops_per_sec']['value'] or 0
+        
+        # Simplified queue info without scanning to avoid hanging issues
+        queue_info = {
+            'total_messages_in_queues': {
+                'value': 0,
+                'description': 'Queue scanning disabled to prevent hanging - shows 0'
+            },
+            'process_rate_per_second': {
+                'value': process_rate,
+                'description': 'Current rate of commands/messages being processed per second'
+            },
+            'queue_details': {
+                'value': [],
+                'description': 'Queue scanning temporarily disabled for stability'
+            },
+            'estimated_processing_time': {
+                'value': "N/A",
+                'description': 'Not available when queue scanning is disabled'
+            },
+            'note': 'Queue scanning disabled to prevent hanging issues'
+        }
+            
+        stats['queues'] = queue_info
             
         logger.info("✅ Successfully gathered Valkey statistics")
         client.close()
@@ -195,8 +293,10 @@ def get_postgres_stats() -> Dict[str, Any]:
 
 def get_postgres_stats() -> Dict[str, Any]:
     """Get PostgreSQL database statistics."""
+    logger.info("🐘 Starting get_postgres_stats()")
     conn = get_postgres_connection()
     if not conn:
+        logger.error("❌ Failed to get PostgreSQL connection in get_postgres_stats()")
         return {'error': 'Cannot connect to PostgreSQL database'}
     
     try:

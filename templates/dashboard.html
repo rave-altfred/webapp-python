@@ -299,48 +299,64 @@
             status.textContent = 'CONNECTED';
             status.className = 'status-indicator status-connected';
 
+            // Helper function to extract value from enhanced structure
+            const getValue = (obj) => obj?.value !== undefined ? obj.value : obj;
+            
             container.innerHTML = `
                 <div class="stat-grid">
                     <div class="stat-item highlight-metric">
                         <span class="stat-label">Database Size</span>
-                        <span class="stat-value">${formatNumber(data.database_size)} keys</span>
+                        <span class="stat-value">${formatNumber(getValue(data.database_size))} keys</span>
                     </div>
                     <div class="stat-item highlight-metric">
                         <span class="stat-label">Hit Ratio</span>
-                        <span class="stat-value">${data.hit_ratio}%</span>
+                        <span class="stat-value">${getValue(data.cache_efficiency?.hit_ratio) || 'N/A'}</span>
+                    </div>
+                    <div class="stat-item highlight-metric">
+                        <span class="stat-label">Process Rate</span>
+                        <span class="stat-value">${formatNumber(getValue(data.queues?.process_rate_per_second))} ops/sec</span>
                     </div>
                     <div class="stat-item">
                         <span class="stat-label">Memory Usage</span>
-                        <span class="stat-value">${data.memory.used_memory_human || 'N/A'}</span>
+                        <span class="stat-value">${getValue(data.memory?.used_memory_human) || 'N/A'}</span>
                     </div>
                     <div class="stat-item">
                         <span class="stat-label">Peak Memory</span>
-                        <span class="stat-value">${data.memory.used_memory_peak_human || 'N/A'}</span>
+                        <span class="stat-value">${getValue(data.memory?.used_memory_peak_human) || 'N/A'}</span>
                     </div>
                     <div class="stat-item">
                         <span class="stat-label">Connected Clients</span>
-                        <span class="stat-value">${formatNumber(data.connected_clients)}</span>
+                        <span class="stat-value">${formatNumber(getValue(data.clients?.connected_clients))}</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-label">Blocked Clients</span>
+                        <span class="stat-value">${formatNumber(getValue(data.clients?.blocked_clients))}</span>
                     </div>
                     <div class="stat-item">
                         <span class="stat-label">Uptime</span>
-                        <span class="stat-value">${formatUptime(data.server.uptime_in_seconds)}</span>
+                        <span class="stat-value">${formatUptime(getValue(data.server?.uptime_in_seconds))}</span>
                     </div>
                     <div class="stat-item">
                         <span class="stat-label">Total Connections</span>
-                        <span class="stat-value">${formatNumber(data.stats.total_connections_received)}</span>
+                        <span class="stat-value">${formatNumber(getValue(data.performance?.total_connections_received))}</span>
                     </div>
                     <div class="stat-item">
                         <span class="stat-label">Commands Processed</span>
-                        <span class="stat-value">${formatNumber(data.stats.total_commands_processed)}</span>
+                        <span class="stat-value">${formatNumber(getValue(data.performance?.total_commands_processed))}</span>
                     </div>
                     <div class="stat-item">
-                        <span class="stat-label">Ops/sec</span>
-                        <span class="stat-value">${formatNumber(data.stats.instantaneous_ops_per_sec)}</span>
+                        <span class="stat-label">Queue Messages</span>
+                        <span class="stat-value">${formatNumber(getValue(data.queues?.total_messages_in_queues))}</span>
                     </div>
                     <div class="stat-item">
                         <span class="stat-label">Server Version</span>
-                        <span class="stat-value">${data.server.redis_version || 'N/A'}</span>
+                        <span class="stat-value">${getValue(data.server?.redis_version) || 'N/A'}</span>
                     </div>
+                </div>
+                <div style="margin-top: 20px; padding: 15px; background: #f8f9fa; border-radius: 8px; font-size: 14px; color: #666;">
+                    <strong>📊 Enhanced Metrics:</strong> All values include detailed descriptions. 
+                    Process rate: ${formatNumber(getValue(data.queues?.process_rate_per_second))} ops/sec, 
+                    Cache efficiency: ${getValue(data.cache_efficiency?.hit_ratio) || 'N/A'}
                 </div>
             `;
         }
@@ -358,6 +374,9 @@
 
             status.textContent = 'CONNECTED';
             status.className = 'status-indicator status-connected';
+            
+            // Helper function to extract value from enhanced structure
+            const getValue = (obj) => obj?.value !== undefined ? obj.value : obj;
 
             let tablesHtml = '';
             if (data.tables && data.tables.length > 0) {
@@ -394,43 +413,43 @@
                 <div class="stat-grid">
                     <div class="stat-item highlight-metric">
                         <span class="stat-label">Database Size</span>
-                        <span class="stat-value">${data.database_size || 'N/A'}</span>
+                        <span class="stat-value">${getValue(data.database_size) || 'N/A'}</span>
                     </div>
                     <div class="stat-item highlight-metric">
                         <span class="stat-label">Cache Hit Ratio</span>
-                        <span class="stat-value">${data.cache_hit_ratio}%</span>
+                        <span class="stat-value">${getValue(data.cache_hit_ratio) || 'N/A'}%</span>
                     </div>
                     <div class="stat-item">
                         <span class="stat-label">Total Connections</span>
-                        <span class="stat-value">${formatNumber(data.connections.total_connections)}</span>
+                        <span class="stat-value">${formatNumber(getValue(data.connections?.total_connections))}</span>
                     </div>
                     <div class="stat-item">
                         <span class="stat-label">Active Connections</span>
-                        <span class="stat-value">${formatNumber(data.connections.active_connections)}</span>
+                        <span class="stat-value">${formatNumber(getValue(data.connections?.active_connections))}</span>
                     </div>
                     <div class="stat-item">
                         <span class="stat-label">Committed Transactions</span>
-                        <span class="stat-value">${formatNumber(data.activity.committed_transactions)}</span>
+                        <span class="stat-value">${formatNumber(getValue(data.activity?.committed_transactions))}</span>
                     </div>
                     <div class="stat-item">
                         <span class="stat-label">Rolled Back Transactions</span>
-                        <span class="stat-value">${formatNumber(data.activity.rolled_back_transactions)}</span>
+                        <span class="stat-value">${formatNumber(getValue(data.activity?.rolled_back_transactions))}</span>
                     </div>
                     <div class="stat-item">
                         <span class="stat-label">Tuples Inserted</span>
-                        <span class="stat-value">${formatNumber(data.activity.tuples_inserted)}</span>
+                        <span class="stat-value">${formatNumber(getValue(data.activity?.tuples_inserted))}</span>
                     </div>
                     <div class="stat-item">
                         <span class="stat-label">Tuples Updated</span>
-                        <span class="stat-value">${formatNumber(data.activity.tuples_updated)}</span>
+                        <span class="stat-value">${formatNumber(getValue(data.activity?.tuples_updated))}</span>
                     </div>
                     <div class="stat-item">
                         <span class="stat-label">Tuples Deleted</span>
-                        <span class="stat-value">${formatNumber(data.activity.tuples_deleted)}</span>
+                        <span class="stat-value">${formatNumber(getValue(data.activity?.tuples_deleted))}</span>
                     </div>
                     <div class="stat-item">
                         <span class="stat-label">Recent Activities (24h)</span>
-                        <span class="stat-value">${formatNumber(data.recent_activities)}</span>
+                        <span class="stat-value">${formatNumber(getValue(data.recent_activities))}</span>
                     </div>
                 </div>
                 ${tablesHtml}
