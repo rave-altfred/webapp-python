@@ -23,6 +23,45 @@ This is a Flask-based database statistics dashboard that monitors Valkey (Redis-
 - `Dockerfile`: Multi-stage build with non-root user and health checks
 - `docker-compose.production.yml`: Production deployment with Caddy proxy
 
+## Security: Docker Secrets
+
+This application now uses Docker Compose secrets for secure credential management instead of embedding passwords in environment files.
+
+### Secrets Setup
+
+1. **Create secrets from environment variables:**
+   ```bash
+   # Set your actual passwords as environment variables
+   export VALKEY_PASSWORD="your_actual_valkey_password"
+   export POSTGRES_PASSWORD="your_actual_postgres_password"
+   export AUTH_PASSWORD="your_secure_web_password"
+   export SPACES_SECRET_KEY="your_digitalocean_spaces_secret"
+   export SECURITY_TOKEN="your_optional_api_token"  # optional
+   
+   # Create secrets files securely
+   ./create-secrets.sh
+   ```
+
+2. **Manual secrets creation:**
+   ```bash
+   mkdir -p secrets
+   echo "your_valkey_password" > secrets/valkey_password
+   echo "your_postgres_password" > secrets/postgres_password
+   echo "your_auth_password" > secrets/auth_password
+   echo "your_security_token" > secrets/security_token  # optional
+   echo "your_spaces_secret" > secrets/spaces_secret_key
+   
+   # Set secure permissions
+   chmod 400 secrets/*
+   ```
+
+3. **Non-sensitive configuration:**
+   ```bash
+   # Use the provided template for non-sensitive config
+   cp .env.secrets .env
+   # Edit .env to adjust non-sensitive settings as needed
+   ```
+
 ## Development Commands
 
 ### Local Development
@@ -35,12 +74,8 @@ source venv/bin/activate  # or venv\Scripts\activate on Windows
 # Install dependencies
 pip install -r requirements.txt
 
-# Set required environment variables
-export VALKEY_HOST=localhost
-export VALKEY_PASSWORD=your_password
-export POSTGRES_HOST=localhost
-export POSTGRES_PASSWORD=your_password
-# See .env.production for full list
+# Set up secrets (see Security section above)
+./create-secrets.sh
 
 # Run development server
 python app.py
@@ -73,10 +108,13 @@ print('PostgreSQL:', postgres is not None)
 ### Docker Development
 
 ```bash
+# Set up secrets first
+./create-secrets.sh
+
 # Build image locally
 docker build -t webapp-python:dev .
 
-# Run with docker-compose
+# Run with docker-compose (uses secrets)
 docker-compose -f docker-compose.production.yml up -d
 
 # View logs
@@ -84,6 +122,9 @@ docker-compose -f docker-compose.production.yml logs -f webapp
 
 # Exec into running container
 docker exec -it webapp-python bash
+
+# Verify secrets are mounted correctly
+docker exec -it webapp-python ls -la /run/secrets/
 ```
 
 ### Database Management
@@ -104,13 +145,27 @@ psql -h $POSTGRES_HOST -U $POSTGRES_USER -d $POSTGRES_DATABASE -c "\dt"
 ### Automated Deployment
 
 ```bash
-# Full build-push-deploy cycle
+# Set up credentials as environment variables first
+export VALKEY_PASSWORD="your_actual_valkey_password"
+export POSTGRES_PASSWORD="your_actual_postgres_password"
+export AUTH_PASSWORD="your_secure_web_password"
+export SPACES_SECRET_KEY="your_digitalocean_spaces_secret"
+export SECURITY_TOKEN="your_optional_api_token"  # optional
+
+# Full build-push-deploy cycle (now uses secrets)
 ./build-push-deploy.sh
 ```
 
 ### Manual Deployment
 
 ```bash
+# Set up secrets first
+export VALKEY_PASSWORD="your_actual_valkey_password"
+export POSTGRES_PASSWORD="your_actual_postgres_password"
+export AUTH_PASSWORD="your_secure_web_password"
+export SPACES_SECRET_KEY="your_digitalocean_spaces_secret"
+./create-secrets.sh
+
 # Authenticate with DigitalOcean registry
 doctl registry login
 
@@ -118,9 +173,10 @@ doctl registry login
 docker build -t registry.digitalocean.com/altfred-registry/webapp-python:latest .
 docker push registry.digitalocean.com/altfred-registry/webapp-python:latest
 
-# Deploy to droplet (requires SSH access)
-scp docker-compose.production.yml production.config.json .env.production Caddyfile root@your-droplet-ip:/opt/webapp-python/
-ssh root@your-droplet-ip "cd /opt/webapp-python && docker-compose -f docker-compose.production.yml up -d"
+# Deploy to droplet (requires SSH access and secrets)
+scp docker-compose.production.yml production.config.json .env Caddyfile root@your-droplet-ip:/opt/webapp-python/
+scp -r secrets/ root@your-droplet-ip:/opt/webapp-python/
+ssh root@your-droplet-ip "cd /opt/webapp-python && chmod -R 400 secrets/* && docker-compose -f docker-compose.production.yml up -d"
 ```
 
 ### Production Monitoring
@@ -216,11 +272,20 @@ Adjust Gunicorn workers in `docker-compose.production.yml`:
 ├── app.py                          # Main Flask application
 ├── requirements.txt                # Python dependencies
 ├── Dockerfile                      # Container definition with multi-stage build
-├── docker-compose.production.yml   # Production deployment configuration
+├── docker-compose.production.yml   # Production deployment configuration (uses secrets)
 ├── production.config.json          # Application settings
-├── .env.production                 # Environment variables (not in git)
+├── .env.secrets                    # Non-sensitive environment variables template
+├── .env                           # Non-sensitive environment variables (generated)
+├── secrets/                        # Docker secrets directory (NOT in git)
+│   ├── README.md                  # Documentation for secrets
+│   ├── valkey_password            # Valkey database password
+│   ├── postgres_password          # PostgreSQL database password
+│   ├── auth_password              # Web interface authentication
+│   ├── security_token             # Optional API security token
+│   └── spaces_secret_key          # DigitalOcean Spaces secret key
+├── create-secrets.sh              # Script to create secrets from environment
 ├── Caddyfile                       # Reverse proxy configuration
-├── build-push-deploy.sh            # Automated deployment script
+├── build-push-deploy.sh            # Automated deployment script (now uses secrets)
 ├── schema.sql                      # PostgreSQL database schema
 ├── templates/dashboard.html        # Frontend dashboard template
 └── README.md                       # Comprehensive documentation

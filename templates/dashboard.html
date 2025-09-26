@@ -58,6 +58,25 @@
             transform: translateY(-2px);
         }
 
+        .nav-links {
+            margin: 20px 0;
+        }
+
+        .nav-links a {
+            color: rgba(255, 255, 255, 0.9);
+            text-decoration: none;
+            margin: 0 15px;
+            padding: 8px 16px;
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            border-radius: 20px;
+            transition: all 0.3s ease;
+        }
+
+        .nav-links a:hover {
+            background: rgba(255, 255, 255, 0.2);
+            transform: translateY(-2px);
+        }
+
         .stats-grid {
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(600px, 1fr));
@@ -235,6 +254,10 @@
         <div class="header">
             <h1>Database Statistics Dashboard</h1>
             <p>Real-time monitoring of Valkey and PostgreSQL databases</p>
+            <div class="nav-links">
+                <a href="/">📊 Dashboard</a>
+                <a href="/observations">🔍 Observations</a>
+            </div>
             <button class="refresh-btn" onclick="refreshData()">🔄 Refresh Data</button>
         </div>
 

@@ -1,0 +1,759 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Observations - Database Dashboard</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+            color: #333;
+        }
+
+        .container {
+            max-width: 1600px;
+            margin: 0 auto;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+            color: white;
+        }
+
+        .header h1 {
+            font-size: 2.5rem;
+            margin-bottom: 10px;
+            text-shadow: 0 2px 4px rgba(0,0,0,0.3);
+        }
+
+        .nav-links {
+            margin: 20px 0;
+        }
+
+        .nav-links a {
+            color: rgba(255, 255, 255, 0.9);
+            text-decoration: none;
+            margin: 0 15px;
+            padding: 8px 16px;
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            border-radius: 20px;
+            transition: all 0.3s ease;
+        }
+
+        .nav-links a:hover {
+            background: rgba(255, 255, 255, 0.2);
+            transform: translateY(-2px);
+        }
+
+        .controls-panel {
+            background: white;
+            border-radius: 15px;
+            padding: 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+        }
+
+        .controls-row {
+            display: flex;
+            gap: 20px;
+            align-items: center;
+            flex-wrap: wrap;
+            margin-bottom: 15px;
+        }
+
+        .search-box {
+            flex: 1;
+            min-width: 300px;
+        }
+
+        .search-box input {
+            width: 100%;
+            padding: 12px 16px;
+            border: 2px solid #e0e0e0;
+            border-radius: 25px;
+            font-size: 16px;
+            transition: border-color 0.3s ease;
+        }
+
+        .search-box input:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        .page-size-select, .refresh-btn {
+            padding: 10px 20px;
+            border: 2px solid #e0e0e0;
+            border-radius: 20px;
+            background: white;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .refresh-btn {
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            color: white;
+            border: none;
+        }
+
+        .refresh-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+        }
+
+        .column-controls {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 15px;
+            margin-top: 10px;
+        }
+
+        .column-toggle {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+
+        .column-toggle input[type="checkbox"] {
+            width: 16px;
+            height: 16px;
+        }
+
+        .table-container {
+            background: white;
+            border-radius: 15px;
+            overflow: hidden;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+        }
+
+        .observations-table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        .observations-table th {
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            color: white;
+            padding: 15px 12px;
+            text-align: left;
+            font-weight: 600;
+            cursor: pointer;
+            user-select: none;
+            position: relative;
+            transition: background-color 0.3s ease;
+        }
+
+        .observations-table th:hover {
+            background: linear-gradient(135deg, #5a6fd8, #6a42a6);
+        }
+
+        .observations-table th.sortable::after {
+            content: '↕️';
+            position: absolute;
+            right: 8px;
+            opacity: 0.7;
+        }
+
+        .observations-table th.sort-asc::after {
+            content: '↑';
+            color: #fff;
+            opacity: 1;
+        }
+
+        .observations-table th.sort-desc::after {
+            content: '↓';
+            color: #fff;
+            opacity: 1;
+        }
+
+        .observations-table td {
+            padding: 12px;
+            border-bottom: 1px solid #e0e0e0;
+            vertical-align: top;
+        }
+
+        .observations-table tr:hover {
+            background-color: #f8f9ff;
+        }
+
+        .image-cell {
+            width: 150px;
+        }
+
+        .observation-image {
+            max-width: 140px;
+            max-height: 100px;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: transform 0.3s ease;
+        }
+
+        .observation-image:hover {
+            transform: scale(1.05);
+        }
+
+        .bbox-info {
+            font-size: 11px;
+            color: #666;
+            margin-top: 4px;
+        }
+
+        .confidence-badge {
+            display: inline-block;
+            padding: 4px 8px;
+            border-radius: 12px;
+            font-size: 12px;
+            font-weight: 600;
+            color: white;
+        }
+
+        .confidence-high { background: #28a745; }
+        .confidence-medium { background: #ffc107; }
+        .confidence-low { background: #dc3545; }
+
+        .observation-type {
+            font-weight: 600;
+            color: #667eea;
+        }
+
+        .timestamp {
+            font-size: 12px;
+            color: #666;
+        }
+
+        .pagination {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+            gap: 10px;
+            background: white;
+            border-top: 1px solid #e0e0e0;
+        }
+
+        .pagination button {
+            padding: 8px 16px;
+            border: 2px solid #e0e0e0;
+            background: white;
+            border-radius: 20px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .pagination button:hover:not(:disabled) {
+            background: #667eea;
+            color: white;
+            border-color: #667eea;
+        }
+
+        .pagination button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .pagination .current-page {
+            background: #667eea;
+            color: white;
+            border-color: #667eea;
+        }
+
+        .stats-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 15px 20px;
+            background: #f8f9ff;
+            border-bottom: 1px solid #e0e0e0;
+            font-size: 14px;
+            color: #666;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 40px;
+            color: #666;
+            font-size: 18px;
+        }
+
+        .error {
+            background: #ffe6e6;
+            color: #d63384;
+            padding: 15px;
+            border-radius: 8px;
+            margin: 20px 0;
+            text-align: center;
+        }
+
+        /* Modal for image preview */
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0,0,0,0.9);
+        }
+
+        .modal-content {
+            margin: auto;
+            display: block;
+            max-width: 90%;
+            max-height: 90%;
+            margin-top: 5%;
+        }
+
+        .close {
+            position: absolute;
+            top: 15px;
+            right: 35px;
+            color: #f1f1f1;
+            font-size: 40px;
+            font-weight: bold;
+            cursor: pointer;
+        }
+
+        .close:hover {
+            color: #bbb;
+        }
+
+        .hidden-column {
+            display: none;
+        }
+
+        @media (max-width: 768px) {
+            .controls-row {
+                flex-direction: column;
+                align-items: stretch;
+            }
+            
+            .search-box {
+                min-width: auto;
+            }
+            
+            .column-controls {
+                justify-content: center;
+            }
+            
+            .observations-table {
+                font-size: 12px;
+            }
+            
+            .observations-table th,
+            .observations-table td {
+                padding: 8px 6px;
+            }
+            
+            .image-cell {
+                width: 80px;
+            }
+            
+            .observation-image {
+                max-width: 70px;
+                max-height: 50px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🔍 Observations</h1>
+            <p>Real-time monitoring of AI detection observations</p>
+            <div class="nav-links">
+                <a href="/">📊 Dashboard</a>
+                <a href="/observations">🔍 Observations</a>
+            </div>
+        </div>
+
+        <div class="controls-panel">
+            <div class="controls-row">
+                <div class="search-box">
+                    <input type="text" id="searchInput" placeholder="🔍 Search observations (job_id, client_id, object_class, etc.)">
+                </div>
+                <select id="pageSizeSelect" class="page-size-select">
+                    <option value="25">25 per page</option>
+                    <option value="50" selected>50 per page</option>
+                    <option value="100">100 per page</option>
+                    <option value="200">200 per page</option>
+                </select>
+                <button class="refresh-btn" onclick="loadObservations()">🔄 Refresh</button>
+            </div>
+            
+            <div class="column-controls">
+                <strong>Show/Hide Columns:</strong>
+                <label class="column-toggle">
+                    <input type="checkbox" class="column-checkbox" data-column="image" checked>
+                    <span>Image</span>
+                </label>
+                <label class="column-toggle">
+                    <input type="checkbox" class="column-checkbox" data-column="id" checked>
+                    <span>ID</span>
+                </label>
+                <label class="column-toggle">
+                    <input type="checkbox" class="column-checkbox" data-column="job_id">
+                    <span>Job ID</span>
+                </label>
+                <label class="column-toggle">
+                    <input type="checkbox" class="column-checkbox" data-column="client_id" checked>
+                    <span>Client</span>
+                </label>
+                <label class="column-toggle">
+                    <input type="checkbox" class="column-checkbox" data-column="stream_id">
+                    <span>Stream</span>
+                </label>
+                <label class="column-toggle">
+                    <input type="checkbox" class="column-checkbox" data-column="observation_type" checked>
+                    <span>Type</span>
+                </label>
+                <label class="column-toggle">
+                    <input type="checkbox" class="column-checkbox" data-column="object_class" checked>
+                    <span>Class</span>
+                </label>
+                <label class="column-toggle">
+                    <input type="checkbox" class="column-checkbox" data-column="confidence" checked>
+                    <span>Confidence</span>
+                </label>
+                <label class="column-toggle">
+                    <input type="checkbox" class="column-checkbox" data-column="bbox">
+                    <span>BBox</span>
+                </label>
+                <label class="column-toggle">
+                    <input type="checkbox" class="column-checkbox" data-column="tracking_id">
+                    <span>Tracking</span>
+                </label>
+                <label class="column-toggle">
+                    <input type="checkbox" class="column-checkbox" data-column="created_at" checked>
+                    <span>Created</span>
+                </label>
+            </div>
+        </div>
+
+        <div class="table-container">
+            <div id="loadingMessage" class="loading">Loading observations...</div>
+            <div id="errorMessage" class="error" style="display: none;"></div>
+            
+            <div id="tableContent" style="display: none;">
+                <div class="stats-row">
+                    <span id="recordsInfo">Showing 0 observations</span>
+                    <span id="searchInfo"></span>
+                </div>
+                
+                <table class="observations-table" id="observationsTable">
+                    <thead>
+                        <tr id="tableHeaders">
+                            <!-- Headers will be populated by JavaScript -->
+                        </tr>
+                    </thead>
+                    <tbody id="observationsBody">
+                        <!-- Data will be populated by JavaScript -->
+                    </tbody>
+                </table>
+                
+                <div class="pagination" id="paginationControls">
+                    <!-- Pagination will be populated by JavaScript -->
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Image Modal -->
+    <div id="imageModal" class="modal">
+        <span class="close">&times;</span>
+        <img class="modal-content" id="modalImage">
+    </div>
+
+    <script>
+        let currentPage = 1;
+        let currentSearch = '';
+        let currentSort = 'created_at';
+        let currentOrder = 'desc';
+        let currentPageSize = 50;
+        let currentData = null;
+
+        // Column definitions
+        const columns = [
+            { key: 'image', label: 'Image', sortable: false },
+            { key: 'id', label: 'ID', sortable: true },
+            { key: 'job_id', label: 'Job ID', sortable: true },
+            { key: 'client_id', label: 'Client ID', sortable: true },
+            { key: 'stream_id', label: 'Stream ID', sortable: true },
+            { key: 'observation_type', label: 'Type', sortable: true },
+            { key: 'object_class', label: 'Object Class', sortable: true },
+            { key: 'confidence', label: 'Confidence', sortable: true },
+            { key: 'bbox', label: 'BBox', sortable: false },
+            { key: 'tracking_id', label: 'Tracking ID', sortable: true },
+            { key: 'created_at', label: 'Created At', sortable: true }
+        ];
+
+        function formatTimestamp(timestamp) {
+            if (!timestamp) return 'N/A';
+            return new Date(timestamp).toLocaleString();
+        }
+
+        function formatConfidence(confidence) {
+            if (confidence === null || confidence === undefined) return 'N/A';
+            const conf = parseFloat(confidence);
+            const percentage = Math.round(conf * 100);
+            let className = 'confidence-low';
+            if (conf > 0.8) className = 'confidence-high';
+            else if (conf > 0.5) className = 'confidence-medium';
+            
+            return `<span class="confidence-badge ${className}">${percentage}%</span>`;
+        }
+
+        function formatBoundingBox(obs) {
+            return `${obs.bbox_x}, ${obs.bbox_y}<br><small class="bbox-info">${obs.bbox_w}×${obs.bbox_h}</small>`;
+        }
+
+        function getVisibleColumns() {
+            const checkboxes = document.querySelectorAll('.column-checkbox:checked');
+            return Array.from(checkboxes).map(cb => cb.dataset.column);
+        }
+
+        function buildTableHeaders() {
+            const visibleColumns = getVisibleColumns();
+            const headerRow = document.getElementById('tableHeaders');
+            headerRow.innerHTML = '';
+            
+            columns.forEach(col => {
+                if (visibleColumns.includes(col.key)) {
+                    const th = document.createElement('th');
+                    th.textContent = col.label;
+                    th.dataset.column = col.key;
+                    
+                    if (col.sortable) {
+                        th.classList.add('sortable');
+                        if (col.key === currentSort) {
+                            th.classList.add(currentOrder === 'asc' ? 'sort-asc' : 'sort-desc');
+                        }
+                        th.onclick = () => sortBy(col.key);
+                    }
+                    
+                    headerRow.appendChild(th);
+                }
+            });
+        }
+
+        function buildTableRow(obs) {
+            const visibleColumns = getVisibleColumns();
+            const row = document.createElement('tr');
+            
+            columns.forEach(col => {
+                if (visibleColumns.includes(col.key)) {
+                    const td = document.createElement('td');
+                    
+                    switch (col.key) {
+                        case 'image':
+                            td.className = 'image-cell';
+                            if (obs.image_path) {
+                                td.innerHTML = `
+                                    <img src="${obs.image_path}" alt="Observation" class="observation-image" onclick="showImageModal('${obs.image_path}')">
+                                `;
+                            } else {
+                                td.innerHTML = '<span style="color: #999;">No image</span>';
+                            }
+                            break;
+                        case 'observation_type':
+                            td.innerHTML = `<span class="observation-type">${obs.observation_type}</span>`;
+                            break;
+                        case 'confidence':
+                            td.innerHTML = formatConfidence(obs.confidence);
+                            break;
+                        case 'bbox':
+                            td.innerHTML = formatBoundingBox(obs);
+                            break;
+                        case 'created_at':
+                            td.innerHTML = `<span class="timestamp">${formatTimestamp(obs.created_at)}</span>`;
+                            break;
+                        case 'ts_start':
+                            td.innerHTML = `<span class="timestamp">${formatTimestamp(obs.ts_start)}</span>`;
+                            break;
+                        default:
+                            td.textContent = obs[col.key] || 'N/A';
+                    }
+                    
+                    row.appendChild(td);
+                }
+            });
+            
+            return row;
+        }
+
+        function renderTable(data) {
+            buildTableHeaders();
+            
+            const tbody = document.getElementById('observationsBody');
+            tbody.innerHTML = '';
+            
+            data.observations.forEach(obs => {
+                tbody.appendChild(buildTableRow(obs));
+            });
+        }
+
+        function renderPagination(pagination) {
+            const container = document.getElementById('paginationControls');
+            container.innerHTML = '';
+            
+            // Previous button
+            const prevBtn = document.createElement('button');
+            prevBtn.textContent = '« Previous';
+            prevBtn.disabled = pagination.page <= 1;
+            prevBtn.onclick = () => changePage(pagination.page - 1);
+            container.appendChild(prevBtn);
+            
+            // Page numbers
+            const startPage = Math.max(1, pagination.page - 2);
+            const endPage = Math.min(pagination.pages, pagination.page + 2);
+            
+            for (let i = startPage; i <= endPage; i++) {
+                const pageBtn = document.createElement('button');
+                pageBtn.textContent = i;
+                if (i === pagination.page) {
+                    pageBtn.className = 'current-page';
+                }
+                pageBtn.onclick = () => changePage(i);
+                container.appendChild(pageBtn);
+            }
+            
+            // Next button
+            const nextBtn = document.createElement('button');
+            nextBtn.textContent = 'Next »';
+            nextBtn.disabled = pagination.page >= pagination.pages;
+            nextBtn.onclick = () => changePage(pagination.page + 1);
+            container.appendChild(nextBtn);
+        }
+
+        function updateRecordsInfo(data) {
+            const recordsInfo = document.getElementById('recordsInfo');
+            const searchInfo = document.getElementById('searchInfo');
+            
+            const start = (data.pagination.page - 1) * data.pagination.limit + 1;
+            const end = Math.min(start + data.observations.length - 1, data.pagination.total);
+            
+            recordsInfo.textContent = `Showing ${start}-${end} of ${data.pagination.total} observations`;
+            
+            if (data.search) {
+                searchInfo.textContent = `Filtered by: "${data.search}"`;
+            } else {
+                searchInfo.textContent = '';
+            }
+        }
+
+        function loadObservations() {
+            document.getElementById('loadingMessage').style.display = 'block';
+            document.getElementById('errorMessage').style.display = 'none';
+            document.getElementById('tableContent').style.display = 'none';
+            
+            const params = new URLSearchParams({
+                page: currentPage,
+                limit: currentPageSize,
+                search: currentSearch,
+                sort: currentSort,
+                order: currentOrder
+            });
+            
+            fetch(`/api/observations?${params}`)
+                .then(response => response.json())
+                .then(data => {
+                    if (data.error) {
+                        throw new Error(data.error);
+                    }
+                    
+                    currentData = data;
+                    renderTable(data);
+                    renderPagination(data.pagination);
+                    updateRecordsInfo(data);
+                    
+                    document.getElementById('loadingMessage').style.display = 'none';
+                    document.getElementById('tableContent').style.display = 'block';
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    document.getElementById('errorMessage').textContent = `Error loading observations: ${error.message}`;
+                    document.getElementById('errorMessage').style.display = 'block';
+                    document.getElementById('loadingMessage').style.display = 'none';
+                });
+        }
+
+        function sortBy(column) {
+            if (currentSort === column) {
+                currentOrder = currentOrder === 'asc' ? 'desc' : 'asc';
+            } else {
+                currentSort = column;
+                currentOrder = 'desc';
+            }
+            currentPage = 1;
+            loadObservations();
+        }
+
+        function changePage(page) {
+            currentPage = page;
+            loadObservations();
+        }
+
+        function showImageModal(imagePath) {
+            const modal = document.getElementById('imageModal');
+            const modalImg = document.getElementById('modalImage');
+            modal.style.display = 'block';
+            modalImg.src = imagePath;
+        }
+
+        // Initialize page
+        document.addEventListener('DOMContentLoaded', function() {
+            // Search functionality
+            const searchInput = document.getElementById('searchInput');
+            let searchTimeout;
+            searchInput.addEventListener('input', function(e) {
+                clearTimeout(searchTimeout);
+                searchTimeout = setTimeout(() => {
+                    currentSearch = e.target.value.trim();
+                    currentPage = 1;
+                    loadObservations();
+                }, 500);
+            });
+            
+            // Page size selector
+            document.getElementById('pageSizeSelect').addEventListener('change', function(e) {
+                currentPageSize = parseInt(e.target.value);
+                currentPage = 1;
+                loadObservations();
+            });
+            
+            // Column visibility controls
+            document.querySelectorAll('.column-checkbox').forEach(checkbox => {
+                checkbox.addEventListener('change', function() {
+                    if (currentData) {
+                        renderTable(currentData);
+                    }
+                });
+            });
+            
+            // Image modal close
+            document.querySelector('.close').onclick = function() {
+                document.getElementById('imageModal').style.display = 'none';
+            };
+            
+            window.onclick = function(event) {
+                const modal = document.getElementById('imageModal');
+                if (event.target == modal) {
+                    modal.style.display = 'none';
+                }
+            };
+            
+            // Load initial data
+            loadObservations();
+        });
+    </script>
+</body>
+</html>

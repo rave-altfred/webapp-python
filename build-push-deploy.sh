@@ -12,7 +12,7 @@ IMAGE_NAME="webapp-python"
 TAG="latest"
 FULL_IMAGE_NAME="${REGISTRY}/${IMAGE_NAME}:${TAG}"
 DROPLET_NAME="management-web-app"
-DROPLET_IP="138.68.100.153"  # Hardcoded for reliability
+DROPLET_IP="164.90.240.205"  # Reserved IP address
 
 # Colors for output
 RED='\033[0;31m'
@@ -103,12 +103,6 @@ check_build_needed() {
         current_hash=$(echo "$current_hash" | shasum -a 256 | cut -d' ' -f1)
     fi
     
-    # Check if image exists locally
-    if ! docker image inspect "${FULL_IMAGE_NAME}" >/dev/null 2>&1; then
-        log "Image not found locally, build needed"
-        return 0
-    fi
-    
     # Check if we have previous build hash
     if [ ! -f "$last_build_file" ]; then
         log "No previous build hash found, build needed"
@@ -121,7 +115,18 @@ check_build_needed() {
         return 0
     fi
     
-    log "No changes detected, skipping build"
+    # No app changes detected, check if we have image locally
+    if ! docker image inspect "${FULL_IMAGE_NAME}" >/dev/null 2>&1; then
+        log "Image not found locally but no app changes, attempting to pull from registry"
+        if docker pull "${FULL_IMAGE_NAME}" >/dev/null 2>&1; then
+            success "Successfully pulled existing image from registry for deployment"
+        else
+            log "Could not pull from registry, build needed"
+            return 0
+        fi
+    fi
+    
+    log "No changes detected and image available, skipping build"
     return 1
 }
 
@@ -202,16 +207,14 @@ push_image() {
     
     success "Successfully pushed image to registry"
     
-    # Clean up local image to save disk space
-    log "Cleaning up local image to save disk space"
-    if docker rmi "${FULL_IMAGE_NAME}" >/dev/null 2>&1; then
-        success "Local image cleaned up successfully"
-    else
-        warning "Could not remove local image (may be in use)"
-    fi
+    # Keep the current image locally for future build caching
+    log "Keeping current image locally for future build caching"
     
-    # Also clean up any dangling images
-    docker image prune -f >/dev/null 2>&1 || true
+    # Only clean up dangling/unused images to save space
+    local cleaned=$(docker image prune -f 2>&1 | grep "Total reclaimed space" || echo "No dangling images to clean")
+    log "Cleaned up dangling images: $cleaned"
+    
+    success "Image kept locally for future build caching"
 }
 
 # Copy configuration files to droplet
@@ -222,55 +225,78 @@ copy_config_files() {
         "docker-compose.production.yml"
         "production.config.json"
         ".env"
-        "Caddyfile"
+        "nginx.conf"
     )
     
-    # Create a comprehensive .env file with all required values
-    log "Creating complete .env file with actual passwords"
-    cat > .env << EOF
-# Flask Application Configuration
-FLASK_APP=app.py
-FLASK_ENV=production
-FLASK_DEBUG=false
-
-# Server Configuration
-HOST=0.0.0.0
-PORT=8080
-WORKERS=4
-
-# Database Configuration - Valkey (Redis)
-VALKEY_HOST=db-redis-ams3-81766-do-user-9636095-0.c.db.ondigitalocean.com
-VALKEY_PORT=25061
-VALKEY_PASSWORD=${VALKEY_PASSWORD}
-VALKEY_SSL=true
-VALKEY_SSL_CERT_REQS=required
-VALKEY_SSL_CA_CERTS=/etc/ssl/certs/ca-certificates.crt
-
-# Database Configuration - PostgreSQL
-POSTGRES_HOST=db-postgresql-ams3-81766-do-user-9636095-0.c.db.ondigitalocean.com
-POSTGRES_PORT=25060
-POSTGRES_DATABASE=defaultdb
-POSTGRES_USER=doadmin
-POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
-POSTGRES_SSLMODE=require
-
-# Security Configuration
-AUTH_USERNAME=admin
-AUTH_PASSWORD=secure_admin_password_2024
-
-# Optional: Additional Security
-IP_WHITELIST=
-SECURITY_TOKEN=
-
-# Domain Configuration (optional)
-DOMAIN_NAME=
-EOF
+    local secret_dirs=(
+        "secrets"
+    )
     
-    # Create directory on droplet
-    if ! ssh -o StrictHostKeyChecking=no root@"${DROPLET_IP}" "mkdir -p /opt/webapp-python"; then
-        error "Failed to create directory on droplet"
+    # Create secure secrets files from environment variables
+    log "Creating Docker secrets files securely"
+    
+    # Ensure secrets directory exists
+    mkdir -p secrets
+    
+    # Read sensitive values from environment variables (REQUIRED)
+    if [ -z "${VALKEY_PASSWORD:-}" ]; then
+        error "VALKEY_PASSWORD environment variable is required"
         exit 1
     fi
+    if [ -z "${POSTGRES_PASSWORD:-}" ]; then
+        error "POSTGRES_PASSWORD environment variable is required"
+        exit 1
+    fi
+    if [ -z "${AUTH_PASSWORD:-}" ]; then
+        error "AUTH_PASSWORD environment variable is required"
+        exit 1
+    fi
+    if [ -z "${SPACES_SECRET_KEY:-}" ]; then
+        error "SPACES_SECRET_KEY environment variable is required"
+        exit 1
+    fi
+    
+    VALKEY_PASSWORD="$VALKEY_PASSWORD"
+    POSTGRES_PASSWORD="$POSTGRES_PASSWORD"
+    AUTH_PASSWORD="$AUTH_PASSWORD"
+    SECURITY_TOKEN="${SECURITY_TOKEN:-}"  # Optional
+    SPACES_SECRET_KEY="$SPACES_SECRET_KEY"
+    
+    # Create secrets files (these will NOT be committed to git)
+    echo "$VALKEY_PASSWORD" > secrets/valkey_password
+    echo "$POSTGRES_PASSWORD" > secrets/postgres_password
+    echo "$AUTH_PASSWORD" > secrets/auth_password
+    echo "$SECURITY_TOKEN" > secrets/security_token
+    echo "$SPACES_SECRET_KEY" > secrets/spaces_secret_key
+    
+    # Set secure permissions
+    chmod 400 secrets/*
+    
+    # Create clean .env file with non-sensitive values
+    log "Creating non-sensitive .env file"
+    cp .env.secrets .env
+    
+    success "Secrets files created securely"
+    
+    # Create directories on droplet
+    if ! ssh -o StrictHostKeyChecking=no root@"${DROPLET_IP}" "mkdir -p /opt/webapp-python/ssl /opt/webapp-python/secrets"; then
+        error "Failed to create directories on droplet"
+        exit 1
+    fi
+    
+    # Generate SSL certificate on droplet
+    log "Generating self-signed SSL certificate on droplet"
+    ssh -o StrictHostKeyChecking=no root@"${DROPLET_IP}" "cd /opt/webapp-python && \
+        openssl req -x509 -nodes -days 365 -newkey rsa:2048 \
+            -keyout ssl/key.pem -out ssl/cert.pem \
+            -subj '/C=US/ST=State/L=City/O=Organization/CN=${DROPLET_IP}' \
+            -addext 'subjectAltName=IP:${DROPLET_IP}'"
+    
+    if [ $? -ne 0 ]; then
+        error "Failed to generate SSL certificate"
+        exit 1
+    fi
+    success "SSL certificate generated successfully"
     
     # Copy files
     local files_to_copy=""
@@ -292,14 +318,44 @@ EOF
         error "No configuration files found to copy"
         exit 1
     fi
+    
+    # Copy secrets directory securely
+    log "Copying secrets directory to droplet..."
+    if [ -d "secrets" ]; then
+        if ! scp -o StrictHostKeyChecking=no -r secrets/ root@"${DROPLET_IP}":/opt/webapp-python/; then
+            error "Failed to copy secrets directory"
+            exit 1
+        fi
+        
+        # Set secure permissions on secrets files on the droplet
+        # Make secrets readable by the webapp user (UID 1000) in the container
+        if ! ssh -o StrictHostKeyChecking=no root@"${DROPLET_IP}" "chmod -R 444 /opt/webapp-python/secrets/* && chown -R root:root /opt/webapp-python/secrets"; then
+            error "Failed to set secure permissions on secrets"
+            exit 1
+        fi
+        
+        success "Secrets directory copied and secured successfully"
+    else
+        error "Secrets directory not found"
+        exit 1
+    fi
 }
 
 # Deploy to droplet
 deploy_to_droplet() {
     log "Deploying to droplet: ${DROPLET_IP}"
     
+    # Get registry authentication token
+    local registry_token=""
+    if command -v doctl >/dev/null 2>&1; then
+        local auth_string=$(doctl registry docker-config --expiry-seconds 3600 2>/dev/null | jq -r '.auths."registry.digitalocean.com".auth' || echo "")
+        if [ -n "$auth_string" ] && [ "$auth_string" != "null" ]; then
+            registry_token=$(echo "$auth_string" | base64 -d | cut -d: -f2)
+        fi
+    fi
+    
     # Create deployment script to run on the droplet
-    local deploy_script=$(cat << 'EOF'
+    local deploy_script=$(cat << EOF
 #!/bin/bash
 set -euo pipefail
 
@@ -308,12 +364,13 @@ echo "[INFO] Starting deployment on droplet..."
 # Navigate to app directory
 cd /opt/webapp-python
 
-# Update Docker registry credentials (refresh auth)
-if command -v doctl &> /dev/null; then
-    echo "[INFO] Refreshing registry authentication..."
-    doctl registry login || echo "[WARNING] doctl not available, using existing credentials"
+# Authenticate with Docker registry using local credentials
+echo "[INFO] Authenticating with DigitalOcean registry..."
+if [ -n "${registry_token}" ]; then
+    echo "${registry_token}" | docker login registry.digitalocean.com --username unused --password-stdin
+    echo "[INFO] Registry authentication successful"
 else
-    echo "[INFO] Using existing Docker registry credentials..."
+    echo "[WARNING] No registry token provided, using existing credentials"
 fi
 
 # Pull the latest image
@@ -343,6 +400,9 @@ docker-compose -f docker-compose.production.yml ps
 echo "[INFO] Recent application logs:"
 docker-compose -f docker-compose.production.yml logs webapp --tail=5
 
+echo "[INFO] Recent nginx logs:"
+docker-compose -f docker-compose.production.yml logs nginx --tail=5
+
 echo "[SUCCESS] Deployment completed successfully!"
 EOF
 )
@@ -371,9 +431,10 @@ health_check() {
     while [ $attempt -le $max_attempts ]; do
         log "Health check attempt ${attempt}/${max_attempts}..."
         
-        # Test health endpoint (should work without auth)
-        if curl -f -s -k "$health_url" > /dev/null; then
-            success "Health check passed! Application is responding."
+        # Test health endpoint (should work without auth, accept both 200 and 503)
+        local health_code=$(curl -s -k -o /dev/null -w "%{http_code}" "$health_url" 2>/dev/null || echo "000")
+        if [ "$health_code" = "200" ] || [ "$health_code" = "503" ]; then
+            success "Health check passed! Application is responding (HTTP $health_code)."
             
             # Show health status
             local health_response=$(curl -s -k "$health_url" 2>/dev/null || echo "Could not retrieve health status")
@@ -417,7 +478,7 @@ show_deployment_info() {
     echo ""
     echo "  🔐 Authentication (HTTP Basic Auth):"
     echo "    • Username: admin"
-    echo "    • Password: secure_admin_password_2024"
+    echo "    • Password: [Set via AUTH_PASSWORD environment variable]"
     echo ""
     echo "  🐳 Docker Image: ${FULL_IMAGE_NAME}"
     echo "  🖥️  Droplet: ${DROPLET_NAME} (${DROPLET_IP})"

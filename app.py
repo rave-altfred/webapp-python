@@ -12,7 +12,11 @@ from typing import Dict, Any, Optional
 import redis
 import psycopg2
 from psycopg2.extras import RealDictCursor
-from flask import Flask, render_template, jsonify, request
+from flask import Flask, render_template, jsonify, request, Response
+from functools import wraps
+import base64
+import hashlib
+import hmac
 import requests
 
 # Configure logging
@@ -24,24 +28,68 @@ logger = logging.getLogger(__name__)
 
 app = Flask(__name__)
 
+def read_secret_file(file_path: str) -> Optional[str]:
+    """Read a secret from a Docker secrets file."""
+    try:
+        if os.path.exists(file_path):
+            with open(file_path, 'r') as f:
+                secret = f.read().strip()
+                if secret:
+                    logger.debug(f"Successfully read secret from {file_path}")
+                    return secret
+                else:
+                    logger.warning(f"Secret file {file_path} is empty")
+        else:
+            logger.debug(f"Secret file {file_path} does not exist")
+    except Exception as e:
+        logger.error(f"Error reading secret file {file_path}: {e}")
+    return None
+
+def get_secret_or_env(env_var: str, secret_file_env: Optional[str] = None) -> Optional[str]:
+    """Get a value from Docker secrets file or fallback to environment variable."""
+    # First try to read from Docker secrets if enabled
+    use_secrets = os.getenv('USE_DOCKER_SECRETS', 'false').lower() == 'true'
+    if use_secrets and secret_file_env:
+        secret_file = os.getenv(secret_file_env)
+        if secret_file:
+            secret_value = read_secret_file(secret_file)
+            if secret_value:
+                return secret_value
+    
+    # Fallback to environment variable
+    return os.getenv(env_var)
+
 # Load configuration
 def load_config():
-    """Load configuration from environment variables and config files."""
+    """Load configuration from environment variables, Docker secrets, and config files."""
     config = {
         'VALKEY_HOST': os.getenv('VALKEY_HOST', 'localhost'),
         'VALKEY_PORT': int(os.getenv('VALKEY_PORT', 6379)),
         'VALKEY_USER': os.getenv('VALKEY_USER'),
-        'VALKEY_PASSWORD': os.getenv('VALKEY_PASSWORD'),
+        'VALKEY_PASSWORD': get_secret_or_env('VALKEY_PASSWORD', 'VALKEY_PASSWORD_FILE'),
         'VALKEY_DB': int(os.getenv('VALKEY_DB', 0)),
         
         'POSTGRES_HOST': os.getenv('POSTGRES_HOST', 'localhost'),
         'POSTGRES_PORT': int(os.getenv('POSTGRES_PORT', 5432)),
         'POSTGRES_DATABASE': os.getenv('POSTGRES_DATABASE', 'webapp_db'),
         'POSTGRES_USER': os.getenv('POSTGRES_USER', 'postgres'),
-        'POSTGRES_PASSWORD': os.getenv('POSTGRES_PASSWORD'),
+        'POSTGRES_PASSWORD': get_secret_or_env('POSTGRES_PASSWORD', 'POSTGRES_PASSWORD_FILE'),
         
         'APP_PORT': int(os.getenv('APP_PORT', 8080)),
-        'DEBUG': os.getenv('DEBUG', 'false').lower() == 'true'
+        'DEBUG': os.getenv('DEBUG', 'false').lower() == 'true',
+        
+        # Security settings
+        'AUTH_USERNAME': os.getenv('AUTH_USERNAME', 'admin'),
+        'AUTH_PASSWORD': get_secret_or_env('AUTH_PASSWORD', 'AUTH_PASSWORD_FILE'),
+        'ALLOWED_IPS': os.getenv('ALLOWED_IPS', '').split(',') if os.getenv('ALLOWED_IPS') else [],
+        'SECURITY_TOKEN': get_secret_or_env('SECURITY_TOKEN', 'SECURITY_TOKEN_FILE'),
+        
+        # DigitalOcean Spaces settings
+        'SPACES_BUCKET': os.getenv('SPACES_BUCKET'),
+        'SPACES_PUBLIC_BASE_URL': os.getenv('SPACES_PUBLIC_BASE_URL'),
+        'SPACES_ACCESS_KEY': os.getenv('SPACES_ACCESS_KEY'),
+        'SPACES_SECRET_KEY': get_secret_or_env('SPACES_SECRET_KEY', 'SPACES_SECRET_KEY_FILE'),
+        'SPACES_ENDPOINT': os.getenv('SPACES_ENDPOINT', 'https://fra1.digitaloceanspaces.com')
     }
     
     # Load from config file if it exists
@@ -57,6 +105,75 @@ def load_config():
     return config
 
 config = load_config()
+
+# Security functions
+def check_auth(username, password):
+    """Check if a username/password combination is valid."""
+    if not config.get('AUTH_PASSWORD'):
+        return True  # No password set, allow access (for development)
+    
+    return (username == config['AUTH_USERNAME'] and 
+            password == config['AUTH_PASSWORD'])
+
+def authenticate():
+    """Send a 401 response that enables basic auth."""
+    return Response(
+        'Authentication required. Please provide valid credentials.',
+        401,
+        {'WWW-Authenticate': 'Basic realm="Database Dashboard"'}
+    )
+
+def check_ip_whitelist():
+    """Check if the client IP is in the allowed list."""
+    if not config.get('ALLOWED_IPS') or not any(config['ALLOWED_IPS']):
+        return True  # No IP restriction if list is empty
+    
+    client_ip = request.environ.get('HTTP_X_FORWARDED_FOR', request.remote_addr)
+    if client_ip:
+        # Handle multiple IPs in X-Forwarded-For header
+        client_ip = client_ip.split(',')[0].strip()
+    
+    logger.info(f"Client IP: {client_ip}, Allowed IPs: {config['ALLOWED_IPS']}")
+    return client_ip in config['ALLOWED_IPS']
+
+def check_security_token():
+    """Check if a valid security token is provided."""
+    if not config.get('SECURITY_TOKEN'):
+        return True  # No token required if not set
+    
+    # Check URL parameter
+    token = request.args.get('token')
+    if not token:
+        # Check Authorization header
+        auth_header = request.headers.get('Authorization')
+        if auth_header and auth_header.startswith('Bearer '):
+            token = auth_header.split(' ')[1]
+    
+    return token == config['SECURITY_TOKEN']
+
+def requires_auth(f):
+    """Decorator that requires authentication."""
+    @wraps(f)
+    def decorated(*args, **kwargs):
+        # Check IP whitelist first
+        if not check_ip_whitelist():
+            logger.warning(f"Access denied from IP: {request.environ.get('HTTP_X_FORWARDED_FOR', request.remote_addr)}")
+            return Response('Access denied: IP not allowed', 403)
+        
+        # Check security token if enabled
+        if not check_security_token():
+            logger.warning(f"Access denied: Invalid or missing security token")
+            return Response('Access denied: Invalid or missing security token', 403)
+        
+        # Check basic auth if password is set
+        if config.get('AUTH_PASSWORD'):
+            auth = request.authorization
+            if not auth or not check_auth(auth.username, auth.password):
+                logger.warning(f"Authentication failed for user: {auth.username if auth else 'None'}")
+                return authenticate()
+        
+        return f(*args, **kwargs)
+    return decorated
 
 # Database connections
 def get_valkey_connection():
@@ -395,11 +512,13 @@ def get_postgres_stats() -> Dict[str, Any]:
         return {'error': f'Error retrieving PostgreSQL statistics: {str(e)}'}
 
 @app.route('/')
+@requires_auth
 def dashboard():
     """Main dashboard page."""
     return render_template('dashboard.html')
 
 @app.route('/api/stats')
+@requires_auth
 def api_stats():
     """API endpoint to get all database statistics."""
     valkey_stats = get_valkey_stats()
@@ -412,6 +531,7 @@ def api_stats():
     })
 
 @app.route('/api/valkey')
+@requires_auth
 def api_valkey():
     """API endpoint to get Valkey statistics."""
     logger.info("🌐 API /api/valkey endpoint called")
@@ -424,9 +544,175 @@ def api_valkey():
         return jsonify({'error': f'API error: {str(e)}'}), 500
 
 @app.route('/api/postgres')
+@requires_auth
 def api_postgres():
     """API endpoint to get PostgreSQL statistics."""
     return jsonify(get_postgres_stats())
+
+@app.route('/observations')
+@requires_auth
+def observations_page():
+    """Observations page."""
+    return render_template('observations.html')
+
+@app.route('/api/observations')
+@requires_auth
+def api_observations():
+    """API endpoint to get observations data with sorting and filtering."""
+    logger.info("🔍 API /api/observations endpoint called")
+    
+    # Get query parameters
+    page = int(request.args.get('page', 1))
+    limit = min(int(request.args.get('limit', 50)), 1000)  # Max 1000 records
+    search = request.args.get('search', '').strip()
+    sort_by = request.args.get('sort', 'created_at')
+    sort_order = request.args.get('order', 'desc').lower()
+    
+    # Validate sort parameters
+    allowed_sort_columns = [
+        'id', 'job_id', 'client_id', 'stream_id', 'observation_type', 'object_class',
+        'confidence', 'ts_start', 'ts_end', 'created_at', 'tracking_id'
+    ]
+    if sort_by not in allowed_sort_columns:
+        sort_by = 'created_at'
+    if sort_order not in ['asc', 'desc']:
+        sort_order = 'desc'
+        
+    conn = get_postgres_connection()
+    if not conn:
+        return jsonify({'error': 'Cannot connect to PostgreSQL database'}), 503
+        
+    try:
+        cursor = conn.cursor(cursor_factory=RealDictCursor)
+        
+        # Build the WHERE clause for search
+        where_conditions = []
+        params = []
+        
+        if search:
+            # Search across multiple text fields
+            search_fields = [
+                'job_id', 'client_id', 'stream_id', 'observation_type', 'object_class'
+            ]
+            search_conditions = []
+            for field in search_fields:
+                search_conditions.append(f"{field}::text ILIKE %s")
+                params.append(f'%{search}%')
+            where_conditions.append(f"({' OR '.join(search_conditions)})")
+        
+        where_clause = 'WHERE ' + ' AND '.join(where_conditions) if where_conditions else ''
+        
+        # Get total count
+        count_query = f"SELECT COUNT(*) as total FROM observations {where_clause}"
+        cursor.execute(count_query, params)
+        total_count = cursor.fetchone()['total']
+        
+        # Get paginated data
+        offset = (page - 1) * limit
+        data_query = f"""
+            SELECT 
+                id, job_id, client_id, stream_id, observation_type, object_class,
+                confidence, bbox_x, bbox_y, bbox_w, bbox_h,
+                ts_start, ts_end, last_refresh_at, spatial_bucket, tracking_id,
+                pose_json, image_path, created_at
+            FROM observations 
+            {where_clause}
+            ORDER BY {sort_by} {sort_order.upper()}
+            LIMIT %s OFFSET %s
+        """
+        
+        cursor.execute(data_query, params + [limit, offset])
+        observations = [dict(row) for row in cursor.fetchall()]
+        
+        # Helper to build signed Spaces image URL
+        def build_image_url(path: str) -> str:
+            try:
+                if not path:
+                    return path
+                    
+                # Check if we have Spaces credentials for signing
+                spaces_key = config.get('SPACES_ACCESS_KEY')
+                spaces_secret = config.get('SPACES_SECRET_KEY')
+                spaces_endpoint = config.get('SPACES_ENDPOINT', 'https://fra1.digitaloceanspaces.com')
+                bucket = config.get('SPACES_BUCKET')
+                
+                if not bucket:
+                    return path
+                    
+                # Normalize path
+                p = path.lstrip('/')
+                if p.startswith(bucket + '/'):
+                    p = p[len(bucket)+1:]
+                
+                if spaces_key and spaces_secret:
+                    # Generate pre-signed URL (valid for 1 hour)
+                    try:
+                        import boto3
+                        from botocore.config import Config
+                        
+                        # Configure S3 client for DigitalOcean Spaces
+                        s3_client = boto3.client(
+                            's3',
+                            endpoint_url=spaces_endpoint,
+                            aws_access_key_id=spaces_key,
+                            aws_secret_access_key=spaces_secret,
+                            region_name='fra1',
+                            config=Config(signature_version='s3v4')
+                        )
+                        
+                        # Generate pre-signed URL
+                        signed_url = s3_client.generate_presigned_url(
+                            'get_object',
+                            Params={'Bucket': bucket, 'Key': p},
+                            ExpiresIn=3600  # 1 hour
+                        )
+                        return signed_url
+                        
+                    except ImportError:
+                        # boto3 not available, fall back to public URL
+                        pass
+                    except Exception as e:
+                        logger.warning(f"Failed to generate signed URL: {e}")
+                        
+                # Fall back to public URL
+                base_url = config.get('SPACES_PUBLIC_BASE_URL')
+                if base_url:
+                    return f"{base_url.rstrip('/')}/{p}"
+                else:
+                    return f"{spaces_endpoint}/{bucket}/{p}"
+                    
+            except Exception as e:
+                logger.error(f"Error building image URL: {e}")
+                return path
+        
+        # Convert timestamps and image paths
+        for obs in observations:
+            for key in ['ts_start', 'ts_end', 'last_refresh_at', 'created_at']:
+                if obs[key]:
+                    obs[key] = obs[key].isoformat()
+            if 'image_path' in obs and obs['image_path']:
+                obs['image_path'] = build_image_url(obs['image_path'])
+        
+        cursor.close()
+        conn.close()
+        
+        return jsonify({
+            'observations': observations,
+            'pagination': {
+                'page': page,
+                'limit': limit,
+                'total': total_count,
+                'pages': (total_count + limit - 1) // limit
+            },
+            'search': search,
+            'sort': {'column': sort_by, 'order': sort_order}
+        })
+        
+    except Exception as e:
+        logger.error(f"❌ Error getting observations: {e}")
+        if conn:
+            conn.close()
+        return jsonify({'error': f'Error retrieving observations: {str(e)}'}), 500
 
 @app.route('/health')
 def health_check():

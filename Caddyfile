@@ -1,28 +1,8 @@
-# Global options must be first
-{
-    auto_https off
+:443 {
+    tls internal
+    reverse_proxy webapp:8080
 }
 
-# Main server configuration for IP-based access
-138.68.100.153 {
-    tls internal
-    
-    reverse_proxy webapp:8080 {
-        header_up Host {host}
-        header_up X-Real-IP {remote_host}
-        header_up X-Forwarded-For {remote_host}
-        header_up X-Forwarded-Proto {scheme}
-    }
-    
-    # Security headers
-    header {
-        -Server
-        X-Content-Type-Options nosniff
-        X-Frame-Options DENY
-        X-XSS-Protection "1; mode=block"
-        Strict-Transport-Security "max-age=31536000; includeSubDomains"
-    }
-    
-    # Enable compression
-    encode gzip
+:80 {
+    redir https://164.90.240.205{uri} permanent
 }

@@ -172,7 +172,17 @@ Temporary Items
 
 # Digital Ocean specific
 .env.production
+.env.local
 config/secrets.json
+
+# Environment files with potential secrets
+.env
+!.env.secrets  # This template is safe to commit
+
+# Docker Secrets (NEVER commit actual secrets)
+secrets/*
+!secrets/README.md
+!secrets/.example-*
 
 # Local development
 .env.local

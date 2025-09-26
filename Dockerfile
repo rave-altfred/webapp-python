@@ -56,6 +56,7 @@ ENV PATH="/opt/venv/bin:$PATH"
 
 # Copy application files
 COPY app.py .
+COPY production.config.json .
 COPY templates/ templates/
 COPY schema.sql .
 
@@ -84,9 +85,7 @@ CMD ["gunicorn", \
      "--bind", "0.0.0.0:8080", \
      "--workers", "4", \
      "--worker-class", "sync", \
-     "--worker-connections", "1000", \
      "--timeout", "30", \
-     "--keepalive", "5", \
      "--max-requests", "1000", \
      "--max-requests-jitter", "100", \
      "--preload", \

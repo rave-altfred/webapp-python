@@ -1,0 +1,85 @@
+# Simple Caddyfile for Database Statistics Dashboard
+# Works with IP address and basic HTTPS
+
+# Global options (must be first)
+{
+    # For Let's Encrypt (if using domain)
+    email admin@example.com
+    
+    # Automatic HTTPS
+    auto_https on
+}
+
+# HTTP redirect to HTTPS
+http://138.68.100.153, http://138.68.100.153:80 {
+    redir https://138.68.100.153{uri} permanent
+}
+
+# HTTPS with self-signed certificate (for IP-based access)
+https://138.68.100.153, 138.68.100.153:443 {
+    # Self-signed certificate for IP access
+    tls internal
+    
+    # Reverse proxy to the Flask app
+    reverse_proxy webapp:8080 {
+        # Health check
+        health_uri /health
+        health_interval 30s
+        health_timeout 5s
+        
+        # Headers for better functionality
+        header_up Host {host}
+        header_up X-Real-IP {remote_host}
+    }
+    
+    # Enable compression
+    encode gzip
+    
+    # Basic security headers
+    header {
+        # Hide server information
+        -Server
+        
+        # Basic security headers
+        X-Content-Type-Options nosniff
+        X-Frame-Options DENY
+        X-XSS-Protection "1; mode=block"
+        
+        # HSTS for HTTPS
+        Strict-Transport-Security "max-age=31536000"
+    }
+    
+    # Access logging
+    log {
+        output stdout
+        level INFO
+    }
+}
+
+# For domain-based access (if you have a domain)
+{$DOMAIN_NAME:} {
+    reverse_proxy webapp:8080 {
+        health_uri /health
+        health_interval 30s
+        health_timeout 5s
+        
+        header_up Host {host}
+        header_up X-Real-IP {remote_host}
+    }
+    
+    encode gzip
+    
+    header {
+        -Server
+        X-Content-Type-Options nosniff
+        X-Frame-Options DENY
+        X-XSS-Protection "1; mode=block"
+        Strict-Transport-Security "max-age=31536000; includeSubDomains"
+    }
+    
+    log {
+        output stdout
+        level INFO
+    }
+}
+
