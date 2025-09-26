@@ -5,18 +5,6 @@
   "DEBUG": false,
   "APP_PORT": 8080,
   
-  "VALKEY_HOST": "10.0.0.4",
-  "VALKEY_PORT": 6379,
-  "VALKEY_DB": 0,
-  "VALKEY_CONNECTION_TIMEOUT": 5,
-  "VALKEY_SOCKET_TIMEOUT": 5,
-  
-  "POSTGRES_HOST": "10.0.0.3",
-  "POSTGRES_PORT": 5432,
-  "POSTGRES_DATABASE": "webapp_db",
-  "POSTGRES_USER": "webapp_user",
-  "POSTGRES_CONNECTION_TIMEOUT": 10,
-  
   "LOGGING": {
     "LEVEL": "INFO",
     "FORMAT": "json",

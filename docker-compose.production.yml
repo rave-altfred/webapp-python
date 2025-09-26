@@ -5,6 +5,7 @@ services:
     image: registry.digitalocean.com/altfred-registry/webapp-python:latest
     container_name: webapp-python
     restart: unless-stopped
+    env_file: .env
     ports:
       - "8080:8080"
     environment:
@@ -24,6 +25,12 @@ services:
       - POSTGRES_DATABASE=${POSTGRES_DATABASE}
       - POSTGRES_USER=${POSTGRES_USER}
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      
+      # Authentication configuration
+      - AUTH_USERNAME=${AUTH_USERNAME}
+      - AUTH_PASSWORD=${AUTH_PASSWORD}
+      - ALLOWED_IPS=${ALLOWED_IPS:-}
+      - SECURITY_TOKEN=${SECURITY_TOKEN:-}
       
       # Configuration file
       - CONFIG_FILE=/app/production.config.json
