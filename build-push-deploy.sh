@@ -235,8 +235,15 @@ copy_config_files() {
     # Create secure secrets files from environment variables
     log "Creating Docker secrets files securely"
     
-    # Ensure secrets directory exists
-    mkdir -p secrets
+    # Handle existing secrets directory gracefully
+    if [ -d "secrets" ]; then
+        log "Updating existing secrets files"
+        # Make existing secrets writable so they can be updated
+        chmod -R 644 secrets/* 2>/dev/null || true
+    else
+        log "Creating new secrets directory"
+        mkdir -p secrets
+    fi
     
     # Read sensitive values from environment variables (REQUIRED)
     if [ -z "${VALKEY_PASSWORD:-}" ]; then
@@ -502,6 +509,15 @@ main() {
     if [ ! -f "app.py" ]; then
         error "app.py not found. Make sure you're running this script from the webapp-python directory."
         exit 1
+    fi
+    
+    # Auto-load environment variables if .env.local exists
+    if [ -f ".env.local" ]; then
+        log "Loading environment variables from .env.local"
+        set -a  # automatically export all variables
+        source .env.local
+        set +a  # stop auto-exporting
+        success "Environment variables loaded from .env.local"
     fi
     
     # Execute deployment pipeline
