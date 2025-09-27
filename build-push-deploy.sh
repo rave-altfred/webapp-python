@@ -223,16 +223,32 @@ setup_letsencrypt_certificate() {
     log "Setting up Let's Encrypt certificate for ${domain}"
     
     # Install certbot if not already installed
+    log "Checking and installing certbot"
     ssh -o StrictHostKeyChecking=no root@"${DROPLET_IP}" "
-        # Fix any dpkg issues first
-        dpkg --configure -a 2>/dev/null || true
-        apt-get install --reinstall -y libc6 2>/dev/null || true
+        # Fix dpkg issues with force and non-interactive mode
+        export DEBIAN_FRONTEND=noninteractive
+        export LANG=C
+        export LC_ALL=C
         
+        # Try to fix dpkg issues
+        dpkg --configure -a --force-depends 2>/dev/null || true
+        
+        # Force fix broken packages
+        apt-get -f install -y 2>/dev/null || true
+        
+        # Skip certbot installation if system is broken - we'll use existing cert
         if ! command -v certbot &> /dev/null; then
             echo 'Installing certbot...'
-            apt-get update && apt-get install -y certbot
+            if apt-get update && apt-get install -y certbot; then
+                echo 'Certbot installed successfully'
+            else
+                echo 'Certbot installation failed - system may have package issues'
+                return 1
+            fi
+        else
+            echo 'Certbot already installed'
         fi
-    "
+    " || return 1
     
     # Stop nginx temporarily for standalone authentication
     log "Temporarily stopping nginx for certificate generation"
@@ -276,9 +292,10 @@ EOF
             chmod +x /etc/letsencrypt/renewal-hooks/deploy/nginx-reload.sh
         "
         success "Let's Encrypt certificate generated successfully for ${domain}"
+        return 0
     else
-        error "Failed to generate Let's Encrypt certificate, falling back to self-signed"
-        setup_selfsigned_certificate "$domain"
+        log "Failed to generate Let's Encrypt certificate - system or network issues"
+        return 1
     fi
 }
 
@@ -409,8 +426,14 @@ copy_config_files() {
         
         # Check if domain looks like a real domain (not an IP)
         if [[ "$DOMAIN_NAME" =~ ^[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$ ]]; then
-            log "Domain ${DOMAIN_NAME} detected - using Let's Encrypt"
-            setup_letsencrypt_certificate "$DOMAIN_NAME"
+            log "Domain ${DOMAIN_NAME} detected - attempting Let's Encrypt"
+            # Try Let's Encrypt, but fall back gracefully if system has issues
+            if setup_letsencrypt_certificate "$DOMAIN_NAME"; then
+                log "Let's Encrypt certificate setup successful"
+            else
+                log "Let's Encrypt failed, using self-signed certificate as fallback"
+                setup_selfsigned_certificate "$DOMAIN_NAME"
+            fi
         else
             log "IP address or invalid domain ${DOMAIN_NAME} detected - using self-signed certificate"
             setup_selfsigned_certificate "$DOMAIN_NAME"
