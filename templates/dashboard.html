@@ -58,11 +58,29 @@
             font-weight: 500;
             margin-top: 16px;
             transition: all 0.2s ease;
+            position: relative;
+            overflow: hidden;
         }
 
         .refresh-btn:hover {
             background: #3182ce;
             transform: translateY(-1px);
+        }
+
+        .refresh-btn.loading {
+            background: #9ca3af;
+            cursor: not-allowed;
+            animation: pulse 1.5s infinite;
+        }
+
+        .refresh-btn.loading:hover {
+            transform: none;
+            background: #9ca3af;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.7; }
         }
 
         .nav-links {
@@ -241,6 +259,12 @@
             font-size: 13px;
             margin-top: 20px;
         }
+        
+        .status-updating {
+            background: #fef3cd !important;
+            color: #997404 !important;
+            animation: pulse 1.5s infinite;
+        }
 
         @media (max-width: 768px) {
             .stats-grid {
@@ -270,7 +294,7 @@
                 <a href="/">📊 Dashboard</a>
                 <a href="/observations">🔍 Observations</a>
             </div>
-            <button class="refresh-btn" onclick="refreshData()">🔄 Refresh Data</button>
+            <button id="refresh-btn" class="refresh-btn" onclick="refreshData()">🔄 Refresh Data</button>
         </div>
 
         <div class="stats-grid">
@@ -558,9 +582,21 @@
             `;
         }
 
+        let isRefreshing = false;
+
         function refreshData() {
-            document.getElementById('valkey-stats').innerHTML = '<div class="loading">Loading Valkey statistics...</div>';
-            document.getElementById('postgres-stats').innerHTML = '<div class="loading">Loading PostgreSQL statistics...</div>';
+            if (isRefreshing) return; // Prevent multiple simultaneous requests
+            
+            isRefreshing = true;
+            const refreshBtn = document.getElementById('refresh-btn');
+            const valkeyStatus = document.getElementById('valkey-status');
+            const postgresStatus = document.getElementById('postgres-status');
+            
+            // Show loading indicators without clearing content
+            refreshBtn.textContent = '🔄 Refreshing...';
+            refreshBtn.classList.add('loading');
+            valkeyStatus.classList.add('status-updating');
+            postgresStatus.classList.add('status-updating');
             
             fetch('/api/stats')
                 .then(response => response.json())
@@ -572,11 +608,63 @@
                 })
                 .catch(error => {
                     console.error('Error fetching stats:', error);
-                    document.getElementById('valkey-stats').innerHTML = 
-                        '<div class="error-message">❌ Error loading Valkey statistics</div>';
-                    document.getElementById('postgres-stats').innerHTML = 
-                        '<div class="error-message">❌ Error loading PostgreSQL statistics</div>';
+                    // Only show error overlay, don't clear existing content
+                    showErrorOverlay('valkey-stats', 'Error loading Valkey statistics');
+                    showErrorOverlay('postgres-stats', 'Error loading PostgreSQL statistics');
+                })
+                .finally(() => {
+                    // Reset loading state
+                    isRefreshing = false;
+                    refreshBtn.textContent = '🔄 Refresh Data';
+                    refreshBtn.classList.remove('loading');
+                    valkeyStatus.classList.remove('status-updating');
+                    postgresStatus.classList.remove('status-updating');
                 });
+        }
+        
+        function showErrorOverlay(containerId, message) {
+            const container = document.getElementById(containerId);
+            const existingOverlay = container.querySelector('.error-overlay');
+            
+            // Remove existing overlay if present
+            if (existingOverlay) {
+                existingOverlay.remove();
+            }
+            
+            // Create new error overlay
+            const overlay = document.createElement('div');
+            overlay.className = 'error-overlay';
+            overlay.style.cssText = `
+                position: absolute;
+                top: 0;
+                left: 0;
+                right: 0;
+                bottom: 0;
+                background: rgba(248, 215, 218, 0.95);
+                color: #721c24;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                border-radius: 8px;
+                font-size: 14px;
+                z-index: 10;
+            `;
+            overlay.innerHTML = `❌ ${message}`;
+            
+            // Position container relatively if not already
+            const containerStyle = window.getComputedStyle(container);
+            if (containerStyle.position === 'static') {
+                container.style.position = 'relative';
+            }
+            
+            container.appendChild(overlay);
+            
+            // Auto-remove after 3 seconds
+            setTimeout(() => {
+                if (overlay.parentNode) {
+                    overlay.remove();
+                }
+            }, 3000);
         }
 
         // Load data on page load
