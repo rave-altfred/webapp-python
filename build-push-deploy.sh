@@ -291,19 +291,36 @@ copy_config_files() {
         exit 1
     fi
     
-    # Generate SSL certificate on droplet
-    log "Generating self-signed SSL certificate on droplet"
-    ssh -o StrictHostKeyChecking=no root@"${DROPLET_IP}" "cd /opt/webapp-python && \
-        openssl req -x509 -nodes -days 365 -newkey rsa:2048 \
-            -keyout ssl/key.pem -out ssl/cert.pem \
-            -subj '/C=US/ST=State/L=City/O=Organization/CN=${DROPLET_IP}' \
-            -addext 'subjectAltName=IP:${DROPLET_IP}'"
+    # Check and generate SSL certificate if needed
+    log "Checking SSL certificate for dash.altfred.com"
     
-    if [ $? -ne 0 ]; then
-        error "Failed to generate SSL certificate"
-        exit 1
+    # Check if valid certificate exists
+    CERT_VALID=$(ssh -o StrictHostKeyChecking=no root@"${DROPLET_IP}" \
+        "cd /opt/webapp-python && \
+        if [ -f ssl/cert.pem ] && [ -f ssl/key.pem ]; then \
+            openssl x509 -in ssl/cert.pem -checkend 2592000 -noout 2>/dev/null && \
+            openssl x509 -in ssl/cert.pem -text -noout | grep -q 'dash.altfred.com' && \
+            echo 'valid' || echo 'invalid'; \
+        else \
+            echo 'missing'; \
+        fi" 2>/dev/null || echo 'missing')
+    
+    if [ "$CERT_VALID" = "valid" ]; then
+        log "Existing SSL certificate is valid for dash.altfred.com, skipping generation"
+    else
+        log "Generating SSL certificate for dash.altfred.com (${CERT_VALID:-missing} certificate)"
+        ssh -o StrictHostKeyChecking=no root@"${DROPLET_IP}" "cd /opt/webapp-python && \
+            openssl req -x509 -nodes -days 365 -newkey rsa:2048 \
+                -keyout ssl/key.pem -out ssl/cert.pem \
+                -subj '/C=US/ST=DE/L=Frankfurt/O=Altfred/CN=dash.altfred.com' \
+                -addext 'subjectAltName=DNS:dash.altfred.com'"
+        
+        if [ $? -ne 0 ]; then
+            error "Failed to generate SSL certificate"
+            exit 1
+        fi
+        success "SSL certificate generated successfully for dash.altfred.com"
     fi
-    success "SSL certificate generated successfully"
     
     # Copy files
     local files_to_copy=""
