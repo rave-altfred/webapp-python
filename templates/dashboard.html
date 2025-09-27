@@ -104,42 +104,41 @@
             border-color: #cbd5e0;
         }
 
-        .stats-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(600px, 1fr));
-            gap: 20px;
+        .services-container {
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
             margin-bottom: 20px;
         }
 
-        .stats-card {
+        .service-line {
             background: white;
-            border-radius: 12px;
-            padding: 24px;
+            border-radius: 8px;
+            padding: 20px;
             border: 1px solid #e2e8f0;
-            transition: border-color 0.2s ease;
+            transition: border-color 0.2s ease, box-shadow 0.2s ease;
         }
 
-        .stats-card:hover {
+        .service-line:hover {
             border-color: #cbd5e0;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
         }
 
-        .card-header {
+        .service-header {
             display: flex;
             align-items: center;
-            margin-bottom: 20px;
-            padding-bottom: 16px;
-            border-bottom: 1px solid #e2e8f0;
+            margin-bottom: 16px;
         }
 
-        .card-icon {
-            width: 40px;
-            height: 40px;
+        .service-icon {
+            width: 32px;
+            height: 32px;
             margin-right: 12px;
             display: flex;
             align-items: center;
             justify-content: center;
-            border-radius: 8px;
-            font-size: 18px;
+            border-radius: 6px;
+            font-size: 16px;
         }
 
         .valkey-icon {
@@ -157,10 +156,64 @@
             color: #2d7d2d;
         }
 
-        .card-title {
-            font-size: 1.25rem;
+        .service-title {
+            font-size: 1.1rem;
             font-weight: 600;
             color: #2d3748;
+        }
+
+        .service-metrics {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 20px;
+            align-items: center;
+        }
+
+        .metric {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-width: 80px;
+        }
+
+        .metric-label {
+            font-size: 11px;
+            font-weight: 500;
+            color: #718096;
+            text-transform: uppercase;
+            margin-bottom: 4px;
+        }
+
+        .metric-value {
+            font-size: 1rem;
+            font-weight: 600;
+            color: #2d3748;
+        }
+
+        .service-details {
+            margin-top: 16px;
+            padding-top: 16px;
+            border-top: 1px solid #e2e8f0;
+            display: none;
+        }
+
+        .service-line.expanded .service-details {
+            display: block;
+        }
+
+        .expand-toggle {
+            background: none;
+            border: none;
+            color: #4299e1;
+            font-size: 12px;
+            cursor: pointer;
+            padding: 4px 8px;
+            border-radius: 4px;
+            transition: background-color 0.2s ease;
+        }
+
+        .expand-toggle:hover {
+            background: #f7fafc;
         }
 
         .status-indicator {
@@ -272,12 +325,13 @@
         }
 
         @media (max-width: 768px) {
-            .stats-grid {
-                grid-template-columns: 1fr;
+            .service-metrics {
+                flex-direction: column;
+                gap: 12px;
             }
             
-            .stat-grid {
-                grid-template-columns: 1fr;
+            .metric {
+                min-width: 60px;
             }
             
             .header h1 {
@@ -302,35 +356,53 @@
             <button id="refresh-btn" class="refresh-btn" onclick="refreshData()">🔄 Refresh Data</button>
         </div>
 
-        <div class="stats-grid">
-            <!-- Valkey Statistics -->
-            <div class="stats-card">
-                <div class="card-header">
-                    <div class="card-icon valkey-icon">🗄️</div>
-                    <h2 class="card-title">Valkey Database</h2>
+        <div class="services-container">
+            <!-- Valkey Service Line -->
+            <div class="service-line" id="valkey-service">
+                <div class="service-header">
+                    <div class="service-icon valkey-icon">🗄️</div>
+                    <h2 class="service-title">Valkey Database</h2>
                     <span id="valkey-status" class="status-indicator">...</span>
+                    <button class="expand-toggle" onclick="toggleDetails('valkey-service')">▼ Details</button>
                 </div>
-                <div id="valkey-stats" class="loading">Loading Valkey statistics...</div>
+                <div id="valkey-metrics" class="service-metrics">
+                    <!-- Metrics will be populated by JavaScript -->
+                </div>
+                <div class="service-details" id="valkey-details">
+                    <!-- Detailed stats will be populated by JavaScript -->
+                </div>
             </div>
 
-            <!-- PostgreSQL Statistics -->
-            <div class="stats-card">
-                <div class="card-header">
-                    <div class="card-icon postgres-icon">🐘</div>
-                    <h2 class="card-title">PostgreSQL Database</h2>
+            <!-- PostgreSQL Service Line -->
+            <div class="service-line" id="postgres-service">
+                <div class="service-header">
+                    <div class="service-icon postgres-icon">🐘</div>
+                    <h2 class="service-title">PostgreSQL Database</h2>
                     <span id="postgres-status" class="status-indicator">...</span>
+                    <button class="expand-toggle" onclick="toggleDetails('postgres-service')">▼ Details</button>
                 </div>
-                <div id="postgres-stats" class="loading">Loading PostgreSQL statistics...</div>
+                <div id="postgres-metrics" class="service-metrics">
+                    <!-- Metrics will be populated by JavaScript -->
+                </div>
+                <div class="service-details" id="postgres-details">
+                    <!-- Detailed stats will be populated by JavaScript -->
+                </div>
             </div>
 
-            <!-- RTSP Reader Statistics -->
-            <div class="stats-card">
-                <div class="card-header">
-                    <div class="card-icon rtsp-icon">📹</div>
-                    <h2 class="card-title">RTSP Reader Service</h2>
+            <!-- RTSP Reader Service Line -->
+            <div class="service-line" id="rtsp-reader-service">
+                <div class="service-header">
+                    <div class="service-icon rtsp-icon">📹</div>
+                    <h2 class="service-title">RTSP Reader Service</h2>
                     <span id="rtsp-reader-status" class="status-indicator">...</span>
+                    <button class="expand-toggle" onclick="toggleDetails('rtsp-reader-service')">▼ Details</button>
                 </div>
-                <div id="rtsp-reader-stats" class="loading">Loading RTSP Reader statistics...</div>
+                <div id="rtsp-reader-metrics" class="service-metrics">
+                    <!-- Metrics will be populated by JavaScript -->
+                </div>
+                <div class="service-details" id="rtsp-reader-details">
+                    <!-- Detailed stats will be populated by JavaScript -->
+                </div>
             </div>
         </div>
 
@@ -394,11 +466,12 @@
         }
 
         function renderValkeyStats(data) {
-            const container = document.getElementById('valkey-stats');
+            const metricsContainer = document.getElementById('valkey-metrics');
+            const detailsContainer = document.getElementById('valkey-details');
             const status = document.getElementById('valkey-status');
             
             if (data.error) {
-                container.innerHTML = `<div class="error-message">❌ ${data.error}</div>`;
+                metricsContainer.innerHTML = `<div class="error-message">❌ ${data.error}</div>`;
                 status.textContent = 'ERROR';
                 status.className = 'status-indicator status-error';
                 return;
@@ -410,39 +483,44 @@
             // Helper function to extract value from enhanced structure
             const getValue = (obj) => obj?.value !== undefined ? obj.value : obj;
             
-            container.innerHTML = `
+            // Key metrics for the main line
+            metricsContainer.innerHTML = `
+                <div class="metric">
+                    <div class="metric-label">Database Size</div>
+                    <div class="metric-value">${formatNumber(getValue(data.database_size))} keys</div>
+                </div>
+                <div class="metric">
+                    <div class="metric-label">Hit Ratio</div>
+                    <div class="metric-value">${getValue(data.cache_efficiency?.hit_ratio) || 'N/A'}</div>
+                </div>
+                <div class="metric">
+                    <div class="metric-label">Memory</div>
+                    <div class="metric-value">${getValue(data.memory?.used_memory_human) || 'N/A'}</div>
+                </div>
+                <div class="metric">
+                    <div class="metric-label">Clients</div>
+                    <div class="metric-value">${formatNumber(getValue(data.clients?.connected_clients))}</div>
+                </div>
+                <div class="metric">
+                    <div class="metric-label">Uptime</div>
+                    <div class="metric-value">${formatUptime(getValue(data.server?.uptime_in_seconds))}</div>
+                </div>
+            `;
+            
+            // Detailed metrics for expanded view
+            detailsContainer.innerHTML = `
                 <div class="stat-grid">
-                    <div class="stat-item highlight-metric">
-                        <span class="stat-label">Database Size</span>
-                        <span class="stat-value">${formatNumber(getValue(data.database_size))} keys</span>
-                    </div>
-                    <div class="stat-item highlight-metric">
-                        <span class="stat-label">Hit Ratio</span>
-                        <span class="stat-value">${getValue(data.cache_efficiency?.hit_ratio) || 'N/A'}</span>
-                    </div>
-                    <div class="stat-item highlight-metric">
+                    <div class="stat-item">
                         <span class="stat-label">Process Rate</span>
                         <span class="stat-value">${formatNumber(getValue(data.queues?.process_rate_per_second))} ops/sec</span>
-                    </div>
-                    <div class="stat-item">
-                        <span class="stat-label">Memory Usage</span>
-                        <span class="stat-value">${getValue(data.memory?.used_memory_human) || 'N/A'}</span>
                     </div>
                     <div class="stat-item">
                         <span class="stat-label">Peak Memory</span>
                         <span class="stat-value">${getValue(data.memory?.used_memory_peak_human) || 'N/A'}</span>
                     </div>
                     <div class="stat-item">
-                        <span class="stat-label">Connected Clients</span>
-                        <span class="stat-value">${formatNumber(getValue(data.clients?.connected_clients))}</span>
-                    </div>
-                    <div class="stat-item">
                         <span class="stat-label">Blocked Clients</span>
                         <span class="stat-value">${formatNumber(getValue(data.clients?.blocked_clients))}</span>
-                    </div>
-                    <div class="stat-item">
-                        <span class="stat-label">Uptime</span>
-                        <span class="stat-value">${formatUptime(getValue(data.server?.uptime_in_seconds))}</span>
                     </div>
                     <div class="stat-item">
                         <span class="stat-label">Total Connections</span>
@@ -461,20 +539,16 @@
                         <span class="stat-value">${getValue(data.server?.redis_version) || 'N/A'}</span>
                     </div>
                 </div>
-                <div style="margin-top: 20px; padding: 15px; background: #f8f9fa; border-radius: 8px; font-size: 14px; color: #666;">
-                    <strong>📊 Enhanced Metrics:</strong> All values include detailed descriptions. 
-                    Process rate: ${formatNumber(getValue(data.queues?.process_rate_per_second))} ops/sec, 
-                    Cache efficiency: ${getValue(data.cache_efficiency?.hit_ratio) || 'N/A'}
-                </div>
             `;
         }
 
         function renderPostgresStats(data) {
-            const container = document.getElementById('postgres-stats');
+            const metricsContainer = document.getElementById('postgres-metrics');
+            const detailsContainer = document.getElementById('postgres-details');
             const status = document.getElementById('postgres-status');
             
             if (data.error) {
-                container.innerHTML = `<div class="error-message">❌ ${data.error}</div>`;
+                metricsContainer.innerHTML = `<div class="error-message">❌ ${data.error}</div>`;
                 status.textContent = 'ERROR';
                 status.className = 'status-indicator status-error';
                 return;
@@ -486,10 +560,36 @@
             // Helper function to extract value from enhanced structure
             const getValue = (obj) => obj?.value !== undefined ? obj.value : obj;
             const getData = (obj) => obj?.data || obj;
-
-            // Summary will be shown at bottom instead of prominent section
-
-            // Build enhanced table statistics with health indicators
+            
+            // Cache hit ratio interpretation
+            const cacheHitRatio = getValue(data.cache_hit_ratio);
+            const cacheColor = cacheHitRatio >= 95 ? '#28a745' : cacheHitRatio >= 90 ? '#f39c12' : '#e74c3c';
+            
+            // Key metrics for the main line
+            metricsContainer.innerHTML = `
+                <div class="metric">
+                    <div class="metric-label">Database Size</div>
+                    <div class="metric-value">${getValue(data.database_size) || 'N/A'}</div>
+                </div>
+                <div class="metric">
+                    <div class="metric-label">Cache Hit Ratio</div>
+                    <div class="metric-value" style="color: ${cacheColor};">${cacheHitRatio || 'N/A'}%</div>
+                </div>
+                <div class="metric">
+                    <div class="metric-label">Active Connections</div>
+                    <div class="metric-value">${formatNumber(getValue(getData(data.connections)?.active_connections))}</div>
+                </div>
+                <div class="metric">
+                    <div class="metric-label">Tables</div>
+                    <div class="metric-value">${data.tables?.data?.length || 0}</div>
+                </div>
+                <div class="metric">
+                    <div class="metric-label">Rollback Ratio</div>
+                    <div class="metric-value" style="color: ${getValue(data.activity?.rollback_ratio) > 5 ? '#f39c12' : '#28a745'};">${getValue(data.activity?.rollback_ratio) || 0}%</div>
+                </div>
+            `;
+            
+            // Build table statistics for details
             let tablesHtml = '';
             if (data.tables && data.tables.data && data.tables.data.length > 0) {
                 tablesHtml = `
@@ -502,9 +602,6 @@
                                     <th title="Current active/visible rows">Live Tuples</th>
                                     <th title="Rows waiting for cleanup">Dead Tuples</th>
                                     <th title="Table health based on dead/live ratio">Health</th>
-                                    <th title="Total INSERT operations">Inserts</th>
-                                    <th title="Total UPDATE operations">Updates</th>
-                                    <th title="Total DELETE operations">Deletes</th>
                                     <th>Size</th>
                                 </tr>
                             </thead>
@@ -523,11 +620,7 @@
                                                 <span style="background: ${healthBg}; color: ${healthColor}; padding: 2px 8px; border-radius: 12px; font-size: 11px; font-weight: 600;">
                                                     ${table.health_status}
                                                 </span>
-                                                ${table.bloat_percentage > 0 ? `<br><span style="font-size: 10px; color: #666;">${table.bloat_percentage}% bloat</span>` : ''}
                                             </td>
-                                            <td>${formatNumber(table.inserts)}</td>
-                                            <td>${formatNumber(table.updates)}</td>
-                                            <td>${formatNumber(table.deletes)}</td>
                                             <td>${table.table_size || 'N/A'}</td>
                                         </tr>
                                     `;
@@ -537,66 +630,26 @@
                     </div>
                 `;
             }
-
-            // Application metrics section
-            let appMetricsHtml = '';
-            if (data.application_metrics && data.application_metrics.data) {
-                const appData = data.application_metrics.data;
-                if (appData.total_observations > 0) {
-                    appMetricsHtml = `
-                        <div style="margin: 20px 0; padding: 15px; background: #e8f4fd; border-radius: 8px; border-left: 4px solid #007bff;">
-                            <h4 style="margin: 0 0 10px 0; color: #007bff;">🔍 Application Metrics (Observations)</h4>
-                            <div class="stat-grid" style="grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px;">
-                                <div><span style="font-weight: 600;">Total:</span> ${formatNumber(appData.total_observations)}</div>
-                                <div><span style="font-weight: 600;">Last 24h:</span> ${formatNumber(appData.recent_observations)}</div>
-                                <div><span style="font-weight: 600;">Last Hour:</span> ${formatNumber(appData.hourly_observations)}</div>
-                                <div><span style="font-weight: 600;">Object Types:</span> ${formatNumber(appData.unique_object_types)}</div>
-                            </div>
-                        </div>
-                    `;
-                }
-            }
-
-            // Cache hit ratio interpretation
-            const cacheHitRatio = getValue(data.cache_hit_ratio);
-            const cacheColor = cacheHitRatio >= 95 ? '#28a745' : cacheHitRatio >= 90 ? '#f39c12' : '#e74c3c';
-            const cacheInterpretation = cacheHitRatio >= 95 ? 'Excellent' : cacheHitRatio >= 90 ? 'Good' : 'Needs Attention';
-
-            container.innerHTML = `
+            
+            // Detailed metrics for expanded view
+            detailsContainer.innerHTML = `
                 ${tablesHtml}
-                ${appMetricsHtml}
                 <div class="stat-grid">
-                    <div class="stat-item highlight-metric">
-                        <span class="stat-label">Database Size</span>
-                        <span class="stat-value">${getValue(data.database_size) || 'N/A'}</span>
-                    </div>
-                    <div class="stat-item highlight-metric">
-                        <span class="stat-label">Cache Hit Ratio</span>
-                        <span class="stat-value" style="color: ${cacheColor};">${cacheHitRatio || 'N/A'}%</span>
-                        <div style="font-size: 10px; color: ${cacheColor}; margin-top: 2px;">${cacheInterpretation}</div>
-                    </div>
                     <div class="stat-item">
-                        <span class="stat-label">Active Connections</span>
-                        <span class="stat-value">${formatNumber(getValue(getData(data.connections)?.active_connections))}</span>
-                        <div style="font-size: 10px; color: #666; margin-top: 2px;">of ${formatNumber(getValue(getData(data.connections)?.total_connections))}</div>
+                        <span class="stat-label">Total Connections</span>
+                        <span class="stat-value">${formatNumber(getValue(getData(data.connections)?.total_connections))}</span>
                     </div>
                     <div class="stat-item">
                         <span class="stat-label">Idle in Transaction</span>
                         <span class="stat-value" style="color: ${getValue(getData(data.connections)?.idle_in_transaction) > 0 ? '#f39c12' : '#28a745'};">${formatNumber(getValue(getData(data.connections)?.idle_in_transaction))}</span>
                     </div>
                     <div class="stat-item">
-                        <span class="stat-label">Rollback Ratio</span>
-                        <span class="stat-value" style="color: ${getValue(data.activity?.rollback_ratio) > 5 ? '#f39c12' : '#28a745'};">${getValue(data.activity?.rollback_ratio) || 0}%</span>
-                    </div>
-                    <div class="stat-item">
                         <span class="stat-label">Blocks Read</span>
                         <span class="stat-value">${formatNumber(getValue(getData(data.activity)?.blocks_read))}</span>
-                        <div style="font-size: 10px; color: #666; margin-top: 2px;">Disk</div>
                     </div>
                     <div class="stat-item">
                         <span class="stat-label">Blocks Hit</span>
                         <span class="stat-value">${formatNumber(getValue(getData(data.activity)?.blocks_hit))}</span>
-                        <div style="font-size: 10px; color: #666; margin-top: 2px;">Memory</div>
                     </div>
                     <div class="stat-item">
                         <span class="stat-label">Tuples Returned</span>
@@ -607,11 +660,12 @@
         }
 
         function renderRtspReaderStats(data) {
-            const container = document.getElementById('rtsp-reader-stats');
+            const metricsContainer = document.getElementById('rtsp-reader-metrics');
+            const detailsContainer = document.getElementById('rtsp-reader-details');
             const status = document.getElementById('rtsp-reader-status');
             
             if (data.error) {
-                container.innerHTML = `<div class="error-message">❌ ${data.error}</div>`;
+                metricsContainer.innerHTML = `<div class="error-message">❌ ${data.error}</div>`;
                 status.textContent = 'ERROR';
                 status.className = 'status-indicator status-error';
                 return;
@@ -634,6 +688,34 @@
             // Helper function to get nested values
             const getValue = (obj, fallback = 'N/A') => obj !== null && obj !== undefined ? obj : fallback;
             
+            // Stream health color
+            const streamHealthColor = data.streams?.health_status === 'Good' ? '#28a745' : '#f39c12';
+            const circuitColor = circuitBreakerOpen ? '#e74c3c' : '#28a745';
+            
+            // Key metrics for the main line
+            metricsContainer.innerHTML = `
+                <div class="metric">
+                    <div class="metric-label">Service</div>
+                    <div class="metric-value" style="color: ${serviceStatus === 'healthy' ? '#28a745' : '#e74c3c'};">${getValue(serviceStatus).toUpperCase()}</div>
+                </div>
+                <div class="metric">
+                    <div class="metric-label">Streams</div>
+                    <div class="metric-value" style="color: ${streamHealthColor};">${getValue(data.streams?.running, 0)}/${getValue(data.streams?.total, 0)}</div>
+                </div>
+                <div class="metric">
+                    <div class="metric-label">Publisher</div>
+                    <div class="metric-value" style="color: ${publisherConnected ? '#28a745' : '#e74c3c'};">${publisherConnected ? 'CONNECTED' : 'DISCONNECTED'}</div>
+                </div>
+                <div class="metric">
+                    <div class="metric-label">Circuit Breaker</div>
+                    <div class="metric-value" style="color: ${circuitColor};">${getValue(data.circuit_breaker?.status)}</div>
+                </div>
+                <div class="metric">
+                    <div class="metric-label">Uptime</div>
+                    <div class="metric-value">${getValue(data.service_info?.uptime?.formatted)}</div>
+                </div>
+            `;
+            
             // Format publisher stats section
             const publisherStats = data.publisher?.stats || {};
             let publisherStatsHtml = '';
@@ -651,48 +733,20 @@
                 `;
             }
             
-            // Circuit breaker status color
-            const circuitColor = circuitBreakerOpen ? '#e74c3c' : '#28a745';
-            const circuitStatus = circuitBreakerOpen ? 'Open (Protection Active)' : 'Closed (Normal)';
-            
-            // Stream health color
-            const streamHealthColor = data.streams?.health_status === 'Good' ? '#28a745' : '#f39c12';
-            
-            container.innerHTML = `
+            // Detailed metrics for expanded view
+            detailsContainer.innerHTML = `
                 <div class="stat-grid">
-                    <div class="stat-item highlight-metric">
-                        <span class="stat-label">Service Status</span>
-                        <span class="stat-value" style="color: ${serviceStatus === 'healthy' ? '#28a745' : '#e74c3c'};">${getValue(serviceStatus).toUpperCase()}</span>
-                    </div>
-                    <div class="stat-item highlight-metric">
-                        <span class="stat-label">Uptime</span>
-                        <span class="stat-value">${getValue(data.service_info?.uptime?.formatted)}</span>
-                    </div>
-                    <div class="stat-item highlight-metric">
+                    <div class="stat-item">
                         <span class="stat-label">Version</span>
                         <span class="stat-value">${getValue(data.service_info?.version)}</span>
                     </div>
                     <div class="stat-item">
-                        <span class="stat-label">Total Streams</span>
-                        <span class="stat-value">${formatNumber(getValue(data.streams?.total, 0))}</span>
-                    </div>
-                    <div class="stat-item">
-                        <span class="stat-label">Running Streams</span>
-                        <span class="stat-value" style="color: ${streamHealthColor};">${formatNumber(getValue(data.streams?.running, 0))}</span>
-                        <div style="font-size: 10px; color: ${streamHealthColor}; margin-top: 2px;">${getValue(data.streams?.health_status)}</div>
-                    </div>
-                    <div class="stat-item">
-                        <span class="stat-label">Publisher</span>
-                        <span class="stat-value" style="color: ${publisherConnected ? '#28a745' : '#e74c3c'};">${publisherConnected ? 'CONNECTED' : 'DISCONNECTED'}</span>
-                    </div>
-                    <div class="stat-item">
-                        <span class="stat-label">Circuit Breaker</span>
-                        <span class="stat-value" style="color: ${circuitColor}; font-size: 1rem;">${getValue(data.circuit_breaker?.status)}</span>
-                        <div style="font-size: 10px; color: ${circuitColor}; margin-top: 2px;">${getValue(data.circuit_breaker?.failures, 0)} failures</div>
-                    </div>
-                    <div class="stat-item">
                         <span class="stat-label">Monitoring</span>
                         <span class="stat-value" style="color: ${data.dynamic_config?.monitoring_enabled ? '#28a745' : '#f39c12'};">${data.dynamic_config?.monitoring_enabled ? 'ENABLED' : 'DISABLED'}</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-label">Circuit Breaker Failures</span>
+                        <span class="stat-value">${getValue(data.circuit_breaker?.failures, 0)}</span>
                     </div>
                 </div>
                 ${publisherStatsHtml}
@@ -729,9 +783,9 @@
                 .catch(error => {
                     console.error('Error fetching stats:', error);
                     // Only show error overlay, don't clear existing content
-                    showErrorOverlay('valkey-stats', 'Error loading Valkey statistics');
-                    showErrorOverlay('postgres-stats', 'Error loading PostgreSQL statistics');
-                    showErrorOverlay('rtsp-reader-stats', 'Error loading RTSP Reader statistics');
+                    showErrorOverlay('valkey-metrics', 'Error loading Valkey statistics');
+                    showErrorOverlay('postgres-metrics', 'Error loading PostgreSQL statistics');
+                    showErrorOverlay('rtsp-reader-metrics', 'Error loading RTSP Reader statistics');
                 })
                 .finally(() => {
                     // Reset loading state
@@ -789,6 +843,21 @@
             }, 3000);
         }
 
+        // Toggle details function
+        function toggleDetails(serviceId) {
+            const serviceLine = document.getElementById(serviceId);
+            const isExpanded = serviceLine.classList.contains('expanded');
+            const toggleBtn = serviceLine.querySelector('.expand-toggle');
+            
+            if (isExpanded) {
+                serviceLine.classList.remove('expanded');
+                toggleBtn.textContent = '▼ Details';
+            } else {
+                serviceLine.classList.add('expanded');
+                toggleBtn.textContent = '▲ Hide';
+            }
+        }
+        
         // Load data on page load
         refreshData();
 
