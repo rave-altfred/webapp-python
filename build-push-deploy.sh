@@ -224,8 +224,12 @@ setup_letsencrypt_certificate() {
     
     # Install certbot if not already installed
     ssh -o StrictHostKeyChecking=no root@"${DROPLET_IP}" "
+        # Fix any dpkg issues first
+        dpkg --configure -a 2>/dev/null || true
+        apt-get install --reinstall -y libc6 2>/dev/null || true
+        
         if ! command -v certbot &> /dev/null; then
-            log 'Installing certbot...'
+            echo 'Installing certbot...'
             apt-get update && apt-get install -y certbot
         fi
     "
