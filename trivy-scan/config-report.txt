@@ -1,0 +1,50 @@
+
+Report Summary
+
+┌────────────┬────────────┬───────────────────┐
+│   Target   │    Type    │ Misconfigurations │
+├────────────┼────────────┼───────────────────┤
+│ Dockerfile │ dockerfile │         2         │
+└────────────┴────────────┴───────────────────┘
+Legend:
+- '-': Not scanned
+- '0': Clean (no security findings detected)
+
+
+Dockerfile (dockerfile)
+=======================
+Tests: 28 (SUCCESSES: 26, FAILURES: 2)
+Failures: 2 (UNKNOWN: 0, LOW: 0, MEDIUM: 0, HIGH: 2, CRITICAL: 0)
+
+AVD-DS-0029 (HIGH): '--no-install-recommends' flag is missed: 'apt-get update && apt-get install -y     gcc     libpq-dev     curl     && rm -rf /var/lib/apt/lists/*'
+═════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════
+'apt-get' install should use '--no-install-recommends' to minimize image size.
+
+See https://avd.aquasec.com/misconfig/ds029
+─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+ Dockerfile:22-26
+─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+  22 ┌ RUN apt-get update && apt-get install -y \
+  23 │     gcc \
+  24 │     libpq-dev \
+  25 │     curl \
+  26 └     && rm -rf /var/lib/apt/lists/*
+─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+
+
+AVD-DS-0029 (HIGH): '--no-install-recommends' flag is missed: 'apt-get update && apt-get install -y     libpq5     curl     && rm -rf /var/lib/apt/lists/*     && apt-get clean'
+═════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════
+'apt-get' install should use '--no-install-recommends' to minimize image size.
+
+See https://avd.aquasec.com/misconfig/ds029
+─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+ Dockerfile:41-45
+─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+  41 ┌ RUN apt-get update && apt-get install -y \
+  42 │     libpq5 \
+  43 │     curl \
+  44 │     && rm -rf /var/lib/apt/lists/* \
+  45 └     && apt-get clean
+─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+
+

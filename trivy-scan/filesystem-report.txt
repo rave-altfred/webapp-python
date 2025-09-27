@@ -1,0 +1,126 @@
+
+Report Summary
+
+┌──────────────────┬────────────┬─────────────────┬─────────┬───────────────────┐
+│      Target      │    Type    │ Vulnerabilities │ Secrets │ Misconfigurations │
+├──────────────────┼────────────┼─────────────────┼─────────┼───────────────────┤
+│ requirements.txt │    pip     │       17        │    -    │         -         │
+├──────────────────┼────────────┼─────────────────┼─────────┼───────────────────┤
+│ Dockerfile       │ dockerfile │        -        │    -    │         2         │
+└──────────────────┴────────────┴─────────────────┴─────────┴───────────────────┘
+Legend:
+- '-': Not scanned
+- '0': Clean (no security findings detected)
+
+
+requirements.txt (pip)
+======================
+Total: 17 (UNKNOWN: 0, LOW: 1, MEDIUM: 13, HIGH: 3, CRITICAL: 0)
+
+┌──────────┬────────────────┬──────────┬────────┬───────────────────┬────────────────┬──────────────────────────────────────────────────────────────┐
+│ Library  │ Vulnerability  │ Severity │ Status │ Installed Version │ Fixed Version  │                            Title                             │
+├──────────┼────────────────┼──────────┼────────┼───────────────────┼────────────────┼──────────────────────────────────────────────────────────────┤
+│ Jinja2   │ CVE-2024-22195 │ MEDIUM   │ fixed  │ 3.1.2             │ 3.1.3          │ jinja2: HTML attribute injection when passing user input as  │
+│          │                │          │        │                   │                │ keys to xmlattr...                                           │
+│          │                │          │        │                   │                │ https://avd.aquasec.com/nvd/cve-2024-22195                   │
+│          ├────────────────┤          │        │                   ├────────────────┼──────────────────────────────────────────────────────────────┤
+│          │ CVE-2024-34064 │          │        │                   │ 3.1.4          │ jinja2: accepts keys containing non-attribute characters     │
+│          │                │          │        │                   │                │ https://avd.aquasec.com/nvd/cve-2024-34064                   │
+│          ├────────────────┤          │        │                   ├────────────────┼──────────────────────────────────────────────────────────────┤
+│          │ CVE-2024-56201 │          │        │                   │ 3.1.5          │ jinja2: Jinja has a sandbox breakout through malicious       │
+│          │                │          │        │                   │                │ filenames                                                    │
+│          │                │          │        │                   │                │ https://avd.aquasec.com/nvd/cve-2024-56201                   │
+│          ├────────────────┤          │        │                   │                ├──────────────────────────────────────────────────────────────┤
+│          │ CVE-2024-56326 │          │        │                   │                │ jinja2: Jinja has a sandbox breakout through indirect        │
+│          │                │          │        │                   │                │ reference to format method...                                │
+│          │                │          │        │                   │                │ https://avd.aquasec.com/nvd/cve-2024-56326                   │
+│          ├────────────────┤          │        │                   ├────────────────┼──────────────────────────────────────────────────────────────┤
+│          │ CVE-2025-27516 │          │        │                   │ 3.1.6          │ jinja2: Jinja sandbox breakout through attr filter selecting │
+│          │                │          │        │                   │                │ format method                                                │
+│          │                │          │        │                   │                │ https://avd.aquasec.com/nvd/cve-2025-27516                   │
+├──────────┼────────────────┼──────────┤        ├───────────────────┼────────────────┼──────────────────────────────────────────────────────────────┤
+│ Werkzeug │ CVE-2024-34069 │ HIGH     │        │ 2.3.7             │ 3.0.3          │ python-werkzeug: user may execute code on a developer's      │
+│          │                │          │        │                   │                │ machine                                                      │
+│          │                │          │        │                   │                │ https://avd.aquasec.com/nvd/cve-2024-34069                   │
+│          ├────────────────┼──────────┤        │                   ├────────────────┼──────────────────────────────────────────────────────────────┤
+│          │ CVE-2023-46136 │ MEDIUM   │        │                   │ 3.0.1, 2.3.8   │ python-werkzeug: high resource consumption leading to denial │
+│          │                │          │        │                   │                │ of service                                                   │
+│          │                │          │        │                   │                │ https://avd.aquasec.com/nvd/cve-2023-46136                   │
+│          ├────────────────┤          │        │                   ├────────────────┼──────────────────────────────────────────────────────────────┤
+│          │ CVE-2024-49766 │          │        │                   │ 3.0.6          │ werkzeug: python-werkzeug: Werkzeug safe_join not safe on    │
+│          │                │          │        │                   │                │ Windows                                                      │
+│          │                │          │        │                   │                │ https://avd.aquasec.com/nvd/cve-2024-49766                   │
+│          ├────────────────┤          │        │                   │                ├──────────────────────────────────────────────────────────────┤
+│          │ CVE-2024-49767 │          │        │                   │                │ werkzeug: python-werkzeug: Werkzeug possible resource        │
+│          │                │          │        │                   │                │ exhaustion when parsing file data in forms...                │
+│          │                │          │        │                   │                │ https://avd.aquasec.com/nvd/cve-2024-49767                   │
+├──────────┼────────────────┼──────────┤        ├───────────────────┼────────────────┼──────────────────────────────────────────────────────────────┤
+│ certifi  │ CVE-2024-39689 │ LOW      │        │ 2023.7.22         │ 2024.7.4       │ python-certifi: Remove root certificates from `GLOBALTRUST`  │
+│          │                │          │        │                   │                │ from the root store                                          │
+│          │                │          │        │                   │                │ https://avd.aquasec.com/nvd/cve-2024-39689                   │
+├──────────┼────────────────┼──────────┤        ├───────────────────┼────────────────┼──────────────────────────────────────────────────────────────┤
+│ gunicorn │ CVE-2024-1135  │ HIGH     │        │ 21.2.0            │ 22.0.0         │ python-gunicorn: HTTP Request Smuggling due to improper      │
+│          │                │          │        │                   │                │ validation of Transfer-Encoding headers                      │
+│          │                │          │        │                   │                │ https://avd.aquasec.com/nvd/cve-2024-1135                    │
+│          ├────────────────┤          │        │                   ├────────────────┼──────────────────────────────────────────────────────────────┤
+│          │ CVE-2024-6827  │          │        │                   │ 23.0.0         │ gunicorn: HTTP Request Smuggling in benoitc/gunicorn         │
+│          │                │          │        │                   │                │ https://avd.aquasec.com/nvd/cve-2024-6827                    │
+├──────────┼────────────────┼──────────┤        ├───────────────────┼────────────────┼──────────────────────────────────────────────────────────────┤
+│ idna     │ CVE-2024-3651  │ MEDIUM   │        │ 3.4               │ 3.7            │ python-idna: potential DoS via resource consumption via      │
+│          │                │          │        │                   │                │ specially crafted inputs to idna.encode()...                 │
+│          │                │          │        │                   │                │ https://avd.aquasec.com/nvd/cve-2024-3651                    │
+├──────────┼────────────────┤          │        ├───────────────────┼────────────────┼──────────────────────────────────────────────────────────────┤
+│ requests │ CVE-2024-35195 │          │        │ 2.31.0            │ 2.32.0         │ requests: subsequent requests to the same host ignore cert   │
+│          │                │          │        │                   │                │ verification                                                 │
+│          │                │          │        │                   │                │ https://avd.aquasec.com/nvd/cve-2024-35195                   │
+│          ├────────────────┤          │        │                   ├────────────────┼──────────────────────────────────────────────────────────────┤
+│          │ CVE-2024-47081 │          │        │                   │ 2.32.4         │ requests: Requests vulnerable to .netrc credentials leak via │
+│          │                │          │        │                   │                │ malicious URLs                                               │
+│          │                │          │        │                   │                │ https://avd.aquasec.com/nvd/cve-2024-47081                   │
+├──────────┼────────────────┤          │        ├───────────────────┼────────────────┼──────────────────────────────────────────────────────────────┤
+│ urllib3  │ CVE-2024-37891 │          │        │ 2.0.7             │ 1.26.19, 2.2.2 │ urllib3: proxy-authorization request header is not stripped  │
+│          │                │          │        │                   │                │ during cross-origin redirects                                │
+│          │                │          │        │                   │                │ https://avd.aquasec.com/nvd/cve-2024-37891                   │
+│          ├────────────────┤          │        │                   ├────────────────┼──────────────────────────────────────────────────────────────┤
+│          │ CVE-2025-50181 │          │        │                   │ 2.5.0          │ urllib3: urllib3 redirects are not disabled when retries are │
+│          │                │          │        │                   │                │ disabled on PoolManager...                                   │
+│          │                │          │        │                   │                │ https://avd.aquasec.com/nvd/cve-2025-50181                   │
+└──────────┴────────────────┴──────────┴────────┴───────────────────┴────────────────┴──────────────────────────────────────────────────────────────┘
+
+Dockerfile (dockerfile)
+=======================
+Tests: 28 (SUCCESSES: 26, FAILURES: 2)
+Failures: 2 (UNKNOWN: 0, LOW: 0, MEDIUM: 0, HIGH: 2, CRITICAL: 0)
+
+AVD-DS-0029 (HIGH): '--no-install-recommends' flag is missed: 'apt-get update && apt-get install -y     gcc     libpq-dev     curl     && rm -rf /var/lib/apt/lists/*'
+═════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════
+'apt-get' install should use '--no-install-recommends' to minimize image size.
+
+See https://avd.aquasec.com/misconfig/ds029
+─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+ Dockerfile:22-26
+─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+  22 ┌ RUN apt-get update && apt-get install -y \
+  23 │     gcc \
+  24 │     libpq-dev \
+  25 │     curl \
+  26 └     && rm -rf /var/lib/apt/lists/*
+─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+
+
+AVD-DS-0029 (HIGH): '--no-install-recommends' flag is missed: 'apt-get update && apt-get install -y     libpq5     curl     && rm -rf /var/lib/apt/lists/*     && apt-get clean'
+═════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════
+'apt-get' install should use '--no-install-recommends' to minimize image size.
+
+See https://avd.aquasec.com/misconfig/ds029
+─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+ Dockerfile:41-45
+─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+  41 ┌ RUN apt-get update && apt-get install -y \
+  42 │     libpq5 \
+  43 │     curl \
+  44 │     && rm -rf /var/lib/apt/lists/* \
+  45 └     && apt-get clean
+─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+
+

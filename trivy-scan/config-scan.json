@@ -1,0 +1,183 @@
+{
+  "SchemaVersion": 2,
+  "CreatedAt": "2025-09-26T22:16:27.421275+03:00",
+  "ArtifactName": ".",
+  "ArtifactType": "filesystem",
+  "Metadata": {
+    "RepoURL": "https://github.com/rave-altfred/webapp-python.git",
+    "Branch": "main",
+    "Commit": "f8d83d61221749837265e42ed1193966c3bbdeaa",
+    "CommitMsg": "Implement secure Docker Compose secrets (clean version)\n\n- Complete Docker Compose secrets implementation for secure credential management\n- Updated docker-compose.production.yml to use Docker secrets instead of environment variables\n- Modified app.py to read credentials from /run/secrets/ when USE_DOCKER_SECRETS=true\n- Created secure secrets/ directory structure with proper .gitignore protection\n- Updated build-push-deploy.sh to require environment variables (no hardcoded fallbacks)\n- Added create-secrets.sh helper script for easy setup from environment variables\n- Updated .env.secrets template for non-sensitive configuration\n- Added comprehensive SECURITY.md documentation\n- Fixed PostgreSQL connection to use correct DigitalOcean credentials (doadmin/defaultdb)\n- Set proper file permissions (444) for secrets accessibility\n\n✅ DEPLOYMENT VERIFIED:\n- Valkey connection: ✅ WORKING (using Docker secrets)\n- PostgreSQL connection: ✅ WORKING (using Docker secrets)\n- Health check: ✅ PASSING (HTTP 200)\n- Authentication: ✅ WORKING (HTTP 401 without credentials)\n- Application status: ✅ HEALTHY\n\n🔒 SECURITY FEATURES:\n- NO hardcoded credentials anywhere in codebase\n- Docker Compose secrets working properly\n- Secure file permissions implemented\n- Git protection active (.gitignore working)\n- Environment variable validation enforced\n\nThis is a complete, secure, production-ready Docker secrets implementation.",
+    "Author": "Rave \u003crave@utils.studio\u003e",
+    "Committer": "Rave \u003crave@utils.studio\u003e"
+  },
+  "Results": [
+    {
+      "Target": "Dockerfile",
+      "Class": "config",
+      "Type": "dockerfile",
+      "MisconfSummary": {
+        "Successes": 26,
+        "Failures": 2
+      },
+      "Misconfigurations": [
+        {
+          "Type": "Dockerfile Security Check",
+          "ID": "DS029",
+          "AVDID": "AVD-DS-0029",
+          "Title": "'apt-get' missing '--no-install-recommends'",
+          "Description": "'apt-get' install should use '--no-install-recommends' to minimize image size.",
+          "Message": "'--no-install-recommends' flag is missed: 'apt-get update \u0026\u0026 apt-get install -y     gcc     libpq-dev     curl     \u0026\u0026 rm -rf /var/lib/apt/lists/*'",
+          "Namespace": "builtin.dockerfile.DS029",
+          "Query": "data.builtin.dockerfile.DS029.deny",
+          "Resolution": "Add '--no-install-recommends' flag to 'apt-get'",
+          "Severity": "HIGH",
+          "PrimaryURL": "https://avd.aquasec.com/misconfig/ds029",
+          "References": [
+            "https://docs.docker.com/develop/develop-images/dockerfile_best-practices/",
+            "https://avd.aquasec.com/misconfig/ds029"
+          ],
+          "Status": "FAIL",
+          "CauseMetadata": {
+            "Provider": "Dockerfile",
+            "Service": "general",
+            "StartLine": 22,
+            "EndLine": 26,
+            "Code": {
+              "Lines": [
+                {
+                  "Number": 22,
+                  "Content": "RUN apt-get update \u0026\u0026 apt-get install -y \\",
+                  "IsCause": true,
+                  "Annotation": "",
+                  "Truncated": false,
+                  "Highlighted": "\u001b[38;5;64mRUN\u001b[0m apt-get update \u001b[38;5;245m\u0026\u0026\u001b[0m apt-get install -y \u001b[38;5;124m\\",
+                  "FirstCause": true,
+                  "LastCause": false
+                },
+                {
+                  "Number": 23,
+                  "Content": "    gcc \\",
+                  "IsCause": true,
+                  "Annotation": "",
+                  "Truncated": false,
+                  "Highlighted": "\u001b[0m    gcc \u001b[38;5;124m\\",
+                  "FirstCause": false,
+                  "LastCause": false
+                },
+                {
+                  "Number": 24,
+                  "Content": "    libpq-dev \\",
+                  "IsCause": true,
+                  "Annotation": "",
+                  "Truncated": false,
+                  "Highlighted": "\u001b[0m    libpq-dev \u001b[38;5;124m\\",
+                  "FirstCause": false,
+                  "LastCause": false
+                },
+                {
+                  "Number": 25,
+                  "Content": "    curl \\",
+                  "IsCause": true,
+                  "Annotation": "",
+                  "Truncated": false,
+                  "Highlighted": "\u001b[0m    curl \u001b[38;5;124m\\",
+                  "FirstCause": false,
+                  "LastCause": false
+                },
+                {
+                  "Number": 26,
+                  "Content": "    \u0026\u0026 rm -rf /var/lib/apt/lists/*",
+                  "IsCause": true,
+                  "Annotation": "",
+                  "Truncated": false,
+                  "Highlighted": "\u001b[0m    \u001b[38;5;245m\u0026\u0026\u001b[0m rm -rf /var/lib/apt/lists/*",
+                  "FirstCause": false,
+                  "LastCause": true
+                }
+              ]
+            }
+          }
+        },
+        {
+          "Type": "Dockerfile Security Check",
+          "ID": "DS029",
+          "AVDID": "AVD-DS-0029",
+          "Title": "'apt-get' missing '--no-install-recommends'",
+          "Description": "'apt-get' install should use '--no-install-recommends' to minimize image size.",
+          "Message": "'--no-install-recommends' flag is missed: 'apt-get update \u0026\u0026 apt-get install -y     libpq5     curl     \u0026\u0026 rm -rf /var/lib/apt/lists/*     \u0026\u0026 apt-get clean'",
+          "Namespace": "builtin.dockerfile.DS029",
+          "Query": "data.builtin.dockerfile.DS029.deny",
+          "Resolution": "Add '--no-install-recommends' flag to 'apt-get'",
+          "Severity": "HIGH",
+          "PrimaryURL": "https://avd.aquasec.com/misconfig/ds029",
+          "References": [
+            "https://docs.docker.com/develop/develop-images/dockerfile_best-practices/",
+            "https://avd.aquasec.com/misconfig/ds029"
+          ],
+          "Status": "FAIL",
+          "CauseMetadata": {
+            "Provider": "Dockerfile",
+            "Service": "general",
+            "StartLine": 41,
+            "EndLine": 45,
+            "Code": {
+              "Lines": [
+                {
+                  "Number": 41,
+                  "Content": "RUN apt-get update \u0026\u0026 apt-get install -y \\",
+                  "IsCause": true,
+                  "Annotation": "",
+                  "Truncated": false,
+                  "Highlighted": "\u001b[38;5;64mRUN\u001b[0m apt-get update \u001b[38;5;245m\u0026\u0026\u001b[0m apt-get install -y \u001b[38;5;124m\\",
+                  "FirstCause": true,
+                  "LastCause": false
+                },
+                {
+                  "Number": 42,
+                  "Content": "    libpq5 \\",
+                  "IsCause": true,
+                  "Annotation": "",
+                  "Truncated": false,
+                  "Highlighted": "\u001b[0m    libpq5 \u001b[38;5;124m\\",
+                  "FirstCause": false,
+                  "LastCause": false
+                },
+                {
+                  "Number": 43,
+                  "Content": "    curl \\",
+                  "IsCause": true,
+                  "Annotation": "",
+                  "Truncated": false,
+                  "Highlighted": "\u001b[0m    curl \u001b[38;5;124m\\",
+                  "FirstCause": false,
+                  "LastCause": false
+                },
+                {
+                  "Number": 44,
+                  "Content": "    \u0026\u0026 rm -rf /var/lib/apt/lists/* \\",
+                  "IsCause": true,
+                  "Annotation": "",
+                  "Truncated": false,
+                  "Highlighted": "\u001b[0m    \u001b[38;5;245m\u0026\u0026\u001b[0m rm -rf /var/lib/apt/lists/* \u001b[38;5;124m\\",
+                  "FirstCause": false,
+                  "LastCause": false
+                },
+                {
+                  "Number": 45,
+                  "Content": "    \u0026\u0026 apt-get clean",
+                  "IsCause": true,
+                  "Annotation": "",
+                  "Truncated": false,
+                  "Highlighted": "\u001b[0m    \u001b[38;5;245m\u0026\u0026\u001b[0m apt-get clean",
+                  "FirstCause": false,
+                  "LastCause": true
+                }
+              ]
+            }
+          }
+        }
+      ]
+    }
+  ]
+}
