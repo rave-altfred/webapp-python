@@ -217,6 +217,94 @@ push_image() {
     success "Image kept locally for future build caching"
 }
 
+# Setup Let's Encrypt SSL certificate
+setup_letsencrypt_certificate() {
+    local domain="$1"
+    log "Setting up Let's Encrypt certificate for ${domain}"
+    
+    # Install certbot if not already installed
+    ssh -o StrictHostKeyChecking=no root@"${DROPLET_IP}" "
+        if ! command -v certbot &> /dev/null; then
+            log 'Installing certbot...'
+            apt-get update && apt-get install -y certbot
+        fi
+    "
+    
+    # Stop nginx temporarily for standalone authentication
+    log "Temporarily stopping nginx for certificate generation"
+    ssh -o StrictHostKeyChecking=no root@"${DROPLET_IP}" "
+        cd /opt/webapp-python && 
+        docker-compose -f docker-compose.production.yml stop nginx 2>/dev/null || true
+    "
+    
+    # Generate Let's Encrypt certificate
+    log "Generating Let's Encrypt certificate for ${domain}"
+    if ssh -o StrictHostKeyChecking=no root@"${DROPLET_IP}" "
+        certbot certonly --standalone \
+            --preferred-challenges http \
+            --email admin@altfred.com \
+            --agree-tos \
+            --no-eff-email \
+            --non-interactive \
+            -d ${domain}
+    "; then
+        # Copy certificates to nginx ssl directory
+        log "Copying Let's Encrypt certificates to nginx directory"
+        ssh -o StrictHostKeyChecking=no root@"${DROPLET_IP}" "
+            cp /etc/letsencrypt/live/${domain}/fullchain.pem /opt/webapp-python/ssl/cert.pem &&
+            cp /etc/letsencrypt/live/${domain}/privkey.pem /opt/webapp-python/ssl/key.pem &&
+            chmod 644 /opt/webapp-python/ssl/cert.pem &&
+            chmod 600 /opt/webapp-python/ssl/key.pem
+        "
+        
+        # Set up automatic renewal hook
+        ssh -o StrictHostKeyChecking=no root@"${DROPLET_IP}" "
+            mkdir -p /etc/letsencrypt/renewal-hooks/deploy
+            cat > /etc/letsencrypt/renewal-hooks/deploy/nginx-reload.sh << 'EOF'
+#!/bin/bash
+# Copy renewed certificates and reload nginx
+cp /etc/letsencrypt/live/${domain}/fullchain.pem /opt/webapp-python/ssl/cert.pem
+cp /etc/letsencrypt/live/${domain}/privkey.pem /opt/webapp-python/ssl/key.pem
+chmod 644 /opt/webapp-python/ssl/cert.pem
+chmod 600 /opt/webapp-python/ssl/key.pem
+cd /opt/webapp-python && docker-compose -f docker-compose.production.yml restart nginx
+EOF
+            chmod +x /etc/letsencrypt/renewal-hooks/deploy/nginx-reload.sh
+        "
+        success "Let's Encrypt certificate generated successfully for ${domain}"
+    else
+        error "Failed to generate Let's Encrypt certificate, falling back to self-signed"
+        setup_selfsigned_certificate "$domain"
+    fi
+}
+
+# Setup self-signed SSL certificate
+setup_selfsigned_certificate() {
+    local domain="$1"
+    log "Generating self-signed certificate for ${domain}"
+    
+    local subject_alt_name=""
+    if [[ "$domain" =~ ^[0-9.]+$ ]]; then
+        # IP address
+        subject_alt_name="IP:${domain}"
+    else
+        # Domain name
+        subject_alt_name="DNS:${domain}"
+    fi
+    
+    ssh -o StrictHostKeyChecking=no root@"${DROPLET_IP}" "cd /opt/webapp-python && \
+        openssl req -x509 -nodes -days 365 -newkey rsa:2048 \
+            -keyout ssl/key.pem -out ssl/cert.pem \
+            -subj '/C=US/ST=DE/L=Frankfurt/O=Altfred/CN=${domain}' \
+            -addext 'subjectAltName=${subject_alt_name}'"
+    
+    if [ $? -ne 0 ]; then
+        error "Failed to generate self-signed certificate"
+        exit 1
+    fi
+    success "Self-signed certificate generated successfully for ${domain}"
+}
+
 # Copy configuration files to droplet
 copy_config_files() {
     log "Copying configuration files to droplet..."
@@ -291,35 +379,38 @@ copy_config_files() {
         exit 1
     fi
     
-    # Check and generate SSL certificate if needed
-    log "Checking SSL certificate for dash.altfred.com"
+    # Get domain from .env file
+    local DOMAIN_NAME=$(grep '^DOMAIN_NAME=' .env | cut -d'=' -f2 | tr -d '"')
+    if [ -z "$DOMAIN_NAME" ]; then
+        DOMAIN_NAME="${DROPLET_IP}"  # Fallback to IP
+    fi
+    
+    log "Checking SSL certificate for ${DOMAIN_NAME}"
     
     # Check if valid certificate exists
     CERT_VALID=$(ssh -o StrictHostKeyChecking=no root@"${DROPLET_IP}" \
         "cd /opt/webapp-python && \
         if [ -f ssl/cert.pem ] && [ -f ssl/key.pem ]; then \
             openssl x509 -in ssl/cert.pem -checkend 2592000 -noout 2>/dev/null && \
-            openssl x509 -in ssl/cert.pem -text -noout | grep -q 'dash.altfred.com' && \
+            openssl x509 -in ssl/cert.pem -text -noout | grep -q '${DOMAIN_NAME}' && \
             echo 'valid' || echo 'invalid'; \
         else \
             echo 'missing'; \
         fi" 2>/dev/null || echo 'missing')
     
     if [ "$CERT_VALID" = "valid" ]; then
-        log "Existing SSL certificate is valid for dash.altfred.com, skipping generation"
+        log "Existing SSL certificate is valid for ${DOMAIN_NAME}, skipping generation"
     else
-        log "Generating SSL certificate for dash.altfred.com (${CERT_VALID:-missing} certificate)"
-        ssh -o StrictHostKeyChecking=no root@"${DROPLET_IP}" "cd /opt/webapp-python && \
-            openssl req -x509 -nodes -days 365 -newkey rsa:2048 \
-                -keyout ssl/key.pem -out ssl/cert.pem \
-                -subj '/C=US/ST=DE/L=Frankfurt/O=Altfred/CN=dash.altfred.com' \
-                -addext 'subjectAltName=DNS:dash.altfred.com'"
+        log "Setting up SSL certificate for ${DOMAIN_NAME} (${CERT_VALID:-missing} certificate)"
         
-        if [ $? -ne 0 ]; then
-            error "Failed to generate SSL certificate"
-            exit 1
+        # Check if domain looks like a real domain (not an IP)
+        if [[ "$DOMAIN_NAME" =~ ^[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$ ]]; then
+            log "Domain ${DOMAIN_NAME} detected - using Let's Encrypt"
+            setup_letsencrypt_certificate "$DOMAIN_NAME"
+        else
+            log "IP address or invalid domain ${DOMAIN_NAME} detected - using self-signed certificate"
+            setup_selfsigned_certificate "$DOMAIN_NAME"
         fi
-        success "SSL certificate generated successfully for dash.altfred.com"
     fi
     
     # Copy files
