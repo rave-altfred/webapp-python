@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Observations - Database Dashboard</title>
+    <title>Observations - System Dashboard</title>
     <style>
         * {
             margin: 0;
@@ -12,63 +12,77 @@
         }
 
         body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            background: #f5f7fa;
             min-height: 100vh;
-            padding: 20px;
-            color: #333;
+            padding: 0;
+            margin: 0;
+            color: #2d3748;
+            line-height: 1.5;
         }
 
         .container {
-            max-width: 1600px;
+            max-width: 1400px;
             margin: 0 auto;
+            padding: 20px;
         }
 
         .header {
-            text-align: center;
-            margin-bottom: 30px;
-            color: white;
+            background: white;
+            padding: 30px;
+            margin: -20px -20px 30px -20px;
+            border-bottom: 1px solid #e2e8f0;
         }
 
         .header h1 {
-            font-size: 2.5rem;
-            margin-bottom: 10px;
-            text-shadow: 0 2px 4px rgba(0,0,0,0.3);
+            color: #2d3748;
+            font-size: 2rem;
+            margin: 0 0 8px 0;
+            font-weight: 600;
+        }
+
+        .header p {
+            color: #718096;
+            font-size: 1rem;
+            margin: 0;
         }
 
         .nav-links {
-            margin: 20px 0;
+            margin: 16px 0 0 0;
         }
 
         .nav-links a {
-            color: rgba(255, 255, 255, 0.9);
+            color: #4a5568;
             text-decoration: none;
-            margin: 0 15px;
+            margin: 0 8px 0 0;
             padding: 8px 16px;
-            border: 2px solid rgba(255, 255, 255, 0.3);
-            border-radius: 20px;
-            transition: all 0.3s ease;
+            border: 1px solid #e2e8f0;
+            border-radius: 6px;
+            transition: all 0.2s ease;
+            font-size: 14px;
+            display: inline-block;
         }
 
         .nav-links a:hover {
-            background: rgba(255, 255, 255, 0.2);
-            transform: translateY(-2px);
+            background: #f7fafc;
+            border-color: #cbd5e0;
         }
 
         .controls-panel {
             background: white;
-            border-radius: 15px;
+            border-radius: 8px;
             padding: 20px;
             margin-bottom: 20px;
-            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+            border: 1px solid #e2e8f0;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
         }
 
         .controls-row {
             display: flex;
-            gap: 20px;
+            gap: 16px;
             align-items: center;
             flex-wrap: wrap;
-            margin-bottom: 15px;
+            margin-bottom: 16px;
         }
 
         .search-box {
@@ -79,35 +93,48 @@
         .search-box input {
             width: 100%;
             padding: 12px 16px;
-            border: 2px solid #e0e0e0;
-            border-radius: 25px;
-            font-size: 16px;
-            transition: border-color 0.3s ease;
+            border: 1px solid #e2e8f0;
+            border-radius: 8px;
+            font-size: 14px;
+            transition: border-color 0.2s ease;
         }
 
         .search-box input:focus {
             outline: none;
-            border-color: #667eea;
+            border-color: #4299e1;
+            box-shadow: 0 0 0 3px rgba(66, 153, 225, 0.1);
         }
 
-        .page-size-select, .refresh-btn {
-            padding: 10px 20px;
-            border: 2px solid #e0e0e0;
-            border-radius: 20px;
+        .page-size-select {
+            padding: 12px 16px;
+            border: 1px solid #e2e8f0;
+            border-radius: 8px;
             background: white;
             cursor: pointer;
-            transition: all 0.3s ease;
+            font-size: 14px;
+            transition: border-color 0.2s ease;
+        }
+
+        .page-size-select:focus {
+            outline: none;
+            border-color: #4299e1;
         }
 
         .refresh-btn {
-            background: linear-gradient(135deg, #667eea, #764ba2);
+            background: #4299e1;
             color: white;
             border: none;
+            padding: 12px 24px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 500;
+            transition: all 0.2s ease;
         }
 
         .refresh-btn:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+            background: #3182ce;
+            transform: translateY(-1px);
         }
 
         .column-controls {
@@ -130,9 +157,10 @@
 
         .table-container {
             background: white;
-            border-radius: 15px;
+            border-radius: 8px;
             overflow: hidden;
-            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+            border: 1px solid #e2e8f0;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
         }
 
         .observations-table {
@@ -141,48 +169,54 @@
         }
 
         .observations-table th {
-            background: linear-gradient(135deg, #667eea, #764ba2);
-            color: white;
-            padding: 15px 12px;
+            background: #f8f9fa;
+            color: #4a5568;
+            padding: 16px 12px;
             text-align: left;
             font-weight: 600;
             cursor: pointer;
             user-select: none;
             position: relative;
-            transition: background-color 0.3s ease;
+            border-bottom: 1px solid #e2e8f0;
+            transition: background-color 0.2s ease;
+            font-size: 14px;
         }
 
         .observations-table th:hover {
-            background: linear-gradient(135deg, #5a6fd8, #6a42a6);
+            background: #f1f5f9;
         }
 
         .observations-table th.sortable::after {
             content: '↕️';
             position: absolute;
             right: 8px;
-            opacity: 0.7;
+            opacity: 0.5;
+            font-size: 12px;
         }
 
         .observations-table th.sort-asc::after {
             content: '↑';
-            color: #fff;
+            color: #4299e1;
             opacity: 1;
+            font-weight: bold;
         }
 
         .observations-table th.sort-desc::after {
             content: '↓';
-            color: #fff;
+            color: #4299e1;
             opacity: 1;
+            font-weight: bold;
         }
 
         .observations-table td {
             padding: 12px;
-            border-bottom: 1px solid #e0e0e0;
+            border-bottom: 1px solid #e2e8f0;
             vertical-align: top;
+            font-size: 14px;
         }
 
         .observations-table tr:hover {
-            background-color: #f8f9ff;
+            background-color: #f7fafc;
         }
 
         .image-cell {
@@ -216,13 +250,13 @@
             color: white;
         }
 
-        .confidence-high { background: #28a745; }
-        .confidence-medium { background: #ffc107; }
-        .confidence-low { background: #dc3545; }
+        .confidence-high { background: #48bb78; }
+        .confidence-medium { background: #ed8936; }
+        .confidence-low { background: #f56565; }
 
         .observation-type {
             font-weight: 600;
-            color: #667eea;
+            color: #4299e1;
         }
 
         .timestamp {
@@ -235,24 +269,25 @@
             justify-content: center;
             align-items: center;
             padding: 20px;
-            gap: 10px;
+            gap: 8px;
             background: white;
-            border-top: 1px solid #e0e0e0;
+            border-top: 1px solid #e2e8f0;
         }
 
         .pagination button {
             padding: 8px 16px;
-            border: 2px solid #e0e0e0;
+            border: 1px solid #e2e8f0;
             background: white;
-            border-radius: 20px;
+            border-radius: 6px;
             cursor: pointer;
-            transition: all 0.3s ease;
+            transition: all 0.2s ease;
+            font-size: 14px;
         }
 
         .pagination button:hover:not(:disabled) {
-            background: #667eea;
+            background: #4299e1;
             color: white;
-            border-color: #667eea;
+            border-color: #4299e1;
         }
 
         .pagination button:disabled {
@@ -261,20 +296,20 @@
         }
 
         .pagination .current-page {
-            background: #667eea;
+            background: #4299e1;
             color: white;
-            border-color: #667eea;
+            border-color: #4299e1;
         }
 
         .stats-row {
             display: flex;
             justify-content: space-between;
             align-items: center;
-            padding: 15px 20px;
-            background: #f8f9ff;
-            border-bottom: 1px solid #e0e0e0;
+            padding: 16px 20px;
+            background: #f8f9fa;
+            border-bottom: 1px solid #e2e8f0;
             font-size: 14px;
-            color: #666;
+            color: #718096;
         }
 
         .loading {
@@ -285,12 +320,13 @@
         }
 
         .error {
-            background: #ffe6e6;
-            color: #d63384;
-            padding: 15px;
+            background: #fed7d7;
+            color: #742a2a;
+            padding: 16px;
             border-radius: 8px;
             margin: 20px 0;
             text-align: center;
+            border-left: 4px solid #f56565;
         }
 
         /* Modal for image preview */
