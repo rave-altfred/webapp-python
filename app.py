@@ -409,7 +409,7 @@ def get_valkey_stats() -> Dict[str, Any]:
         return {'error': f'Error retrieving Valkey statistics: {str(e)}'}
 
 def get_postgres_stats() -> Dict[str, Any]:
-    """Get PostgreSQL database statistics."""
+    """Get PostgreSQL database statistics with enhanced descriptions and metrics."""
     logger.info("🐘 Starting get_postgres_stats()")
     conn = get_postgres_connection()
     if not conn:
@@ -420,16 +420,19 @@ def get_postgres_stats() -> Dict[str, Any]:
         cursor = conn.cursor(cursor_factory=RealDictCursor)
         stats = {}
         
-        # Database size
+        # Database size with description
         cursor.execute("""
             SELECT pg_size_pretty(pg_database_size(current_database())) as size,
                    pg_database_size(current_database()) as size_bytes
         """)
         size_result = cursor.fetchone()
-        stats['database_size'] = size_result['size']
-        stats['database_size_bytes'] = size_result['size_bytes']
+        stats['database_size'] = {
+            'value': size_result['size'],
+            'bytes': size_result['size_bytes'],
+            'description': 'Total disk space used by the database including all tables, indexes, and data'
+        }
         
-        # Table statistics
+        # Enhanced table statistics with better explanations
         cursor.execute("""
             SELECT 
                 schemaname,
@@ -442,26 +445,74 @@ def get_postgres_stats() -> Dict[str, Any]:
                 last_vacuum,
                 last_autovacuum,
                 last_analyze,
-                last_autoanalyze
+                last_autoanalyze,
+                pg_size_pretty(pg_total_relation_size(schemaname||'.'||relname)) as table_size
             FROM pg_stat_user_tables
             ORDER BY n_live_tup DESC
         """)
         tables = cursor.fetchall()
-        stats['tables'] = [dict(table) for table in tables]
         
-        # Connection statistics
+        # Add table health indicators
+        enhanced_tables = []
+        for table in tables:
+            table_dict = dict(table)
+            # Calculate table health metrics
+            live = table_dict['live_tuples'] or 0
+            dead = table_dict['dead_tuples'] or 0
+            total_ops = (table_dict['inserts'] or 0) + (table_dict['updates'] or 0) + (table_dict['deletes'] or 0)
+            
+            # Table bloat indicator (dead tuples vs live tuples ratio)
+            if live > 0:
+                bloat_ratio = (dead / live) * 100
+                table_dict['bloat_percentage'] = round(bloat_ratio, 1)
+                if bloat_ratio > 20:
+                    table_dict['health_status'] = 'Needs Vacuum'
+                elif bloat_ratio > 10:
+                    table_dict['health_status'] = 'Fair'
+                else:
+                    table_dict['health_status'] = 'Good'
+            else:
+                table_dict['bloat_percentage'] = 0
+                table_dict['health_status'] = 'Empty' if total_ops == 0 else 'Good'
+            
+            enhanced_tables.append(table_dict)
+        
+        stats['tables'] = {
+            'data': enhanced_tables,
+            'description': 'Individual table statistics showing current row counts, operations, and health status',
+            'metrics_explained': {
+                'live_tuples': 'Current number of active/visible rows in the table',
+                'dead_tuples': 'Rows marked for deletion but not yet cleaned up by VACUUM',
+                'inserts': 'Total INSERT operations since last statistics reset',
+                'updates': 'Total UPDATE operations since last statistics reset', 
+                'deletes': 'Total DELETE operations since last statistics reset',
+                'health_status': 'Table health based on dead/live tuple ratio (Good < 10%, Fair < 20%, Needs Vacuum > 20%)'
+            }
+        }
+        
+        # Connection statistics with descriptions
         cursor.execute("""
             SELECT 
                 count(*) as total_connections,
                 count(*) FILTER (WHERE state = 'active') as active_connections,
-                count(*) FILTER (WHERE state = 'idle') as idle_connections
+                count(*) FILTER (WHERE state = 'idle') as idle_connections,
+                count(*) FILTER (WHERE state = 'idle in transaction') as idle_in_transaction
             FROM pg_stat_activity
             WHERE datname = current_database()
         """)
         conn_result = cursor.fetchone()
-        stats['connections'] = dict(conn_result)
+        stats['connections'] = {
+            'data': dict(conn_result),
+            'description': 'Current database connection status and usage',
+            'metrics_explained': {
+                'total_connections': 'All current connections to this database',
+                'active_connections': 'Connections currently executing queries',
+                'idle_connections': 'Connections not currently executing queries',
+                'idle_in_transaction': 'Connections holding open transactions (potential concern if high)'
+            }
+        }
         
-        # Database activity
+        # Enhanced database activity with explanations
         cursor.execute("""
             SELECT 
                 xact_commit as committed_transactions,
@@ -472,34 +523,102 @@ def get_postgres_stats() -> Dict[str, Any]:
                 tup_fetched as tuples_fetched,
                 tup_inserted as tuples_inserted,
                 tup_updated as tuples_updated,
-                tup_deleted as tuples_deleted
+                tup_deleted as tuples_deleted,
+                temp_files as temp_files_created,
+                temp_bytes as temp_bytes_written
             FROM pg_stat_database 
             WHERE datname = current_database()
         """)
         activity_result = cursor.fetchone()
-        stats['activity'] = dict(activity_result)
+        activity_data = dict(activity_result)
         
-        # Calculate cache hit ratio
-        if stats['activity']['blocks_read'] + stats['activity']['blocks_hit'] > 0:
-            hit_ratio = (stats['activity']['blocks_hit'] / 
-                        (stats['activity']['blocks_read'] + stats['activity']['blocks_hit'])) * 100
-            stats['cache_hit_ratio'] = round(hit_ratio, 2)
+        # Calculate additional metrics
+        total_transactions = activity_data['committed_transactions'] + activity_data['rolled_back_transactions']
+        if total_transactions > 0:
+            rollback_ratio = (activity_data['rolled_back_transactions'] / total_transactions) * 100
         else:
-            stats['cache_hit_ratio'] = 0
+            rollback_ratio = 0
             
-        # Recent activity (last 24 hours) from our application tables if they exist
+        stats['activity'] = {
+            'data': activity_data,
+            'rollback_ratio': round(rollback_ratio, 2),
+            'description': 'Database transaction and I/O activity since last statistics reset',
+            'metrics_explained': {
+                'committed_transactions': 'Successfully completed transactions',
+                'rolled_back_transactions': 'Transactions that were rolled back (higher values may indicate issues)',
+                'blocks_read': 'Data blocks read from disk (slower)',
+                'blocks_hit': 'Data blocks found in memory cache (faster)',
+                'tuples_returned': 'Total rows returned by queries',
+                'tuples_fetched': 'Rows actually retrieved by applications'
+            }
+        }
+        
+        # Calculate and explain cache hit ratio
+        total_blocks = stats['activity']['data']['blocks_read'] + stats['activity']['data']['blocks_hit']
+        if total_blocks > 0:
+            hit_ratio = (stats['activity']['data']['blocks_hit'] / total_blocks) * 100
+        else:
+            hit_ratio = 0
+            
+        stats['cache_hit_ratio'] = {
+            'value': round(hit_ratio, 2),
+            'description': 'Percentage of data blocks found in memory vs read from disk',
+            'interpretation': 'Higher is better (>95% is excellent, 90-95% is good, <90% may indicate memory issues)'
+        }
+        
+        # Database summary metrics
+        total_live_tuples = sum(table['live_tuples'] or 0 for table in enhanced_tables)
+        total_dead_tuples = sum(table['dead_tuples'] or 0 for table in enhanced_tables)
+        tables_needing_vacuum = len([t for t in enhanced_tables if t['health_status'] == 'Needs Vacuum'])
+        
+        stats['summary'] = {
+            'total_live_rows': {
+                'value': total_live_tuples,
+                'description': 'Total active rows across all application tables'
+            },
+            'total_dead_rows': {
+                'value': total_dead_tuples,
+                'description': 'Total deleted/updated rows waiting for cleanup'
+            },
+            'tables_needing_maintenance': {
+                'value': tables_needing_vacuum,
+                'description': 'Number of tables that would benefit from VACUUM operation'
+            },
+            'overall_health': {
+                'value': 'Good' if tables_needing_vacuum == 0 else f'{tables_needing_vacuum} tables need attention',
+                'description': 'Overall database health assessment based on table statistics'
+            }
+        }
+            
+        # Check for observations table (main application table)
         try:
-            cursor.execute("SELECT COUNT(*) FROM information_schema.tables WHERE table_name = 'user_activities'")
+            cursor.execute("SELECT COUNT(*) FROM information_schema.tables WHERE table_name = 'observations'")
             if cursor.fetchone()[0] > 0:
                 cursor.execute("""
-                    SELECT COUNT(*) as recent_activities
-                    FROM user_activities 
-                    WHERE created_at > NOW() - INTERVAL '24 hours'
+                    SELECT 
+                        COUNT(*) as total_observations,
+                        COUNT(*) FILTER (WHERE created_at > NOW() - INTERVAL '24 hours') as recent_observations,
+                        COUNT(*) FILTER (WHERE created_at > NOW() - INTERVAL '1 hour') as hourly_observations,
+                        COUNT(DISTINCT object_class) as unique_object_types
+                    FROM observations
                 """)
-                recent_result = cursor.fetchone()
-                stats['recent_activities'] = recent_result['recent_activities']
-        except:
-            stats['recent_activities'] = 0
+                obs_result = cursor.fetchone()
+                stats['application_metrics'] = {
+                    'data': dict(obs_result),
+                    'description': 'Application-specific metrics from the observations table',
+                    'metrics_explained': {
+                        'total_observations': 'All observations/detections stored in the database',
+                        'recent_observations': 'New observations in the last 24 hours', 
+                        'hourly_observations': 'New observations in the last hour',
+                        'unique_object_types': 'Different types of objects being detected'
+                    }
+                }
+        except Exception as e:
+            logger.debug(f"Application metrics not available: {e}")
+            stats['application_metrics'] = {
+                'data': {'total_observations': 0, 'recent_observations': 0, 'hourly_observations': 0},
+                'description': 'Application table not found or not accessible'
+            }
             
         cursor.close()
         conn.close()
