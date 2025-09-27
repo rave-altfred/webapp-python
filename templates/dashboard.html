@@ -152,6 +152,11 @@
             color: #2b6cb0;
         }
 
+        .rtsp-icon {
+            background: #d6f5d6;
+            color: #2d7d2d;
+        }
+
         .card-title {
             font-size: 1.25rem;
             font-weight: 600;
@@ -288,8 +293,8 @@
 <body>
     <div class="container">
         <div class="header">
-            <h1>Database Statistics Dashboard</h1>
-            <p>Real-time monitoring of Valkey and PostgreSQL databases</p>
+            <h1>System Dashboard</h1>
+            <p>Real-time monitoring of databases and services</p>
             <div class="nav-links">
                 <a href="/">📊 Dashboard</a>
                 <a href="/observations">🔍 Observations</a>
@@ -317,6 +322,16 @@
                 </div>
                 <div id="postgres-stats" class="loading">Loading PostgreSQL statistics...</div>
             </div>
+
+            <!-- RTSP Reader Statistics -->
+            <div class="stats-card">
+                <div class="card-header">
+                    <div class="card-icon rtsp-icon">📹</div>
+                    <h2 class="card-title">RTSP Reader Service</h2>
+                    <span id="rtsp-reader-status" class="status-indicator">...</span>
+                </div>
+                <div id="rtsp-reader-stats" class="loading">Loading RTSP Reader statistics...</div>
+            </div>
         </div>
 
         <!-- Metric Explanations Section -->
@@ -340,6 +355,15 @@
                     • <strong>Health Status:</strong> Good (&lt;10% dead), Fair (&lt;20% dead), Needs Vacuum (&gt;20% dead)<br>
                     • <strong>Bloat %:</strong> Ratio of dead tuples to live tuples (indicates need for maintenance)<br>
                     • <strong>Operations:</strong> Total INSERT/UPDATE/DELETE operations since last statistics reset
+                </div>
+                <div>
+                    <strong style="color: #4a5568; display: block; margin-bottom: 8px;">📹 RTSP Reader Metrics:</strong>
+                    • <strong>Service Status:</strong> Overall health status of the RTSP Reader service<br>
+                    • <strong>Uptime:</strong> Time since last service restart<br>
+                    • <strong>Streams:</strong> Total configured vs actively running RTSP streams<br>
+                    • <strong>Publisher:</strong> Message publisher connection status and performance<br>
+                    • <strong>Circuit Breaker:</strong> Protection mechanism status (Closed = normal, Open = error protection)<br>
+                    • <strong>Queue Stats:</strong> Message publishing queue size and error counts
                 </div>
             </div>
         </div>
@@ -582,6 +606,99 @@
             `;
         }
 
+        function renderRtspReaderStats(data) {
+            const container = document.getElementById('rtsp-reader-stats');
+            const status = document.getElementById('rtsp-reader-status');
+            
+            if (data.error) {
+                container.innerHTML = `<div class="error-message">❌ ${data.error}</div>`;
+                status.textContent = 'ERROR';
+                status.className = 'status-indicator status-error';
+                return;
+            }
+
+            // Determine overall status
+            const serviceStatus = data.service_info?.status || 'unknown';
+            const publisherConnected = data.publisher?.connected || false;
+            const streamsHealthy = data.streams?.health_status === 'Good';
+            const circuitBreakerOpen = data.circuit_breaker?.open || false;
+            
+            if (serviceStatus === 'healthy' && publisherConnected && streamsHealthy && !circuitBreakerOpen) {
+                status.textContent = 'HEALTHY';
+                status.className = 'status-indicator status-connected';
+            } else {
+                status.textContent = 'WARNING';
+                status.className = 'status-indicator status-error';
+            }
+            
+            // Helper function to get nested values
+            const getValue = (obj, fallback = 'N/A') => obj !== null && obj !== undefined ? obj : fallback;
+            
+            // Format publisher stats section
+            const publisherStats = data.publisher?.stats || {};
+            let publisherStatsHtml = '';
+            if (publisherConnected && Object.keys(publisherStats).length > 0) {
+                publisherStatsHtml = `
+                    <div style="margin: 20px 0; padding: 15px; background: #e8f5e8; border-radius: 8px; border-left: 4px solid #28a745;">
+                        <h4 style="margin: 0 0 10px 0; color: #28a745;">📤 Publisher Performance</h4>
+                        <div class="stat-grid" style="grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 10px;">
+                            <div><span style="font-weight: 600;">Queue Size:</span> ${formatNumber(getValue(publisherStats.queue_size, 0))}</div>
+                            <div><span style="font-weight: 600;">Frames Published:</span> ${formatNumber(getValue(publisherStats.frames_published, 0))}</div>
+                            <div><span style="font-weight: 600;">Publish Errors:</span> <span style="color: ${publisherStats.publish_errors > 0 ? '#e74c3c' : '#28a745'};">${formatNumber(getValue(publisherStats.publish_errors, 0))}</span></div>
+                            <div><span style="font-weight: 600;">Queue Drops:</span> <span style="color: ${publisherStats.queue_full_drops > 0 ? '#f39c12' : '#28a745'};">${formatNumber(getValue(publisherStats.queue_full_drops, 0))}</span></div>
+                        </div>
+                    </div>
+                `;
+            }
+            
+            // Circuit breaker status color
+            const circuitColor = circuitBreakerOpen ? '#e74c3c' : '#28a745';
+            const circuitStatus = circuitBreakerOpen ? 'Open (Protection Active)' : 'Closed (Normal)';
+            
+            // Stream health color
+            const streamHealthColor = data.streams?.health_status === 'Good' ? '#28a745' : '#f39c12';
+            
+            container.innerHTML = `
+                <div class="stat-grid">
+                    <div class="stat-item highlight-metric">
+                        <span class="stat-label">Service Status</span>
+                        <span class="stat-value" style="color: ${serviceStatus === 'healthy' ? '#28a745' : '#e74c3c'};">${getValue(serviceStatus).toUpperCase()}</span>
+                    </div>
+                    <div class="stat-item highlight-metric">
+                        <span class="stat-label">Uptime</span>
+                        <span class="stat-value">${getValue(data.service_info?.uptime?.formatted)}</span>
+                    </div>
+                    <div class="stat-item highlight-metric">
+                        <span class="stat-label">Version</span>
+                        <span class="stat-value">${getValue(data.service_info?.version)}</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-label">Total Streams</span>
+                        <span class="stat-value">${formatNumber(getValue(data.streams?.total, 0))}</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-label">Running Streams</span>
+                        <span class="stat-value" style="color: ${streamHealthColor};">${formatNumber(getValue(data.streams?.running, 0))}</span>
+                        <div style="font-size: 10px; color: ${streamHealthColor}; margin-top: 2px;">${getValue(data.streams?.health_status)}</div>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-label">Publisher</span>
+                        <span class="stat-value" style="color: ${publisherConnected ? '#28a745' : '#e74c3c'};">${publisherConnected ? 'CONNECTED' : 'DISCONNECTED'}</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-label">Circuit Breaker</span>
+                        <span class="stat-value" style="color: ${circuitColor}; font-size: 1rem;">${getValue(data.circuit_breaker?.status)}</span>
+                        <div style="font-size: 10px; color: ${circuitColor}; margin-top: 2px;">${getValue(data.circuit_breaker?.failures, 0)} failures</div>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-label">Monitoring</span>
+                        <span class="stat-value" style="color: ${data.dynamic_config?.monitoring_enabled ? '#28a745' : '#f39c12'};">${data.dynamic_config?.monitoring_enabled ? 'ENABLED' : 'DISABLED'}</span>
+                    </div>
+                </div>
+                ${publisherStatsHtml}
+            `;
+        }
+
         let isRefreshing = false;
 
         function refreshData() {
@@ -591,18 +708,21 @@
             const refreshBtn = document.getElementById('refresh-btn');
             const valkeyStatus = document.getElementById('valkey-status');
             const postgresStatus = document.getElementById('postgres-status');
+            const rtspReaderStatus = document.getElementById('rtsp-reader-status');
             
             // Show loading indicators without clearing content
             refreshBtn.textContent = '🔄 Refreshing...';
             refreshBtn.classList.add('loading');
             valkeyStatus.classList.add('status-updating');
             postgresStatus.classList.add('status-updating');
+            rtspReaderStatus.classList.add('status-updating');
             
             fetch('/api/stats')
                 .then(response => response.json())
                 .then(data => {
                     renderValkeyStats(data.valkey);
                     renderPostgresStats(data.postgres);
+                    renderRtspReaderStats(data.rtsp_reader);
                     document.getElementById('last-updated').textContent = 
                         `Last updated: ${new Date(data.timestamp).toLocaleString()}`;
                 })
@@ -611,6 +731,7 @@
                     // Only show error overlay, don't clear existing content
                     showErrorOverlay('valkey-stats', 'Error loading Valkey statistics');
                     showErrorOverlay('postgres-stats', 'Error loading PostgreSQL statistics');
+                    showErrorOverlay('rtsp-reader-stats', 'Error loading RTSP Reader statistics');
                 })
                 .finally(() => {
                     // Reset loading state
@@ -619,6 +740,7 @@
                     refreshBtn.classList.remove('loading');
                     valkeyStatus.classList.remove('status-updating');
                     postgresStatus.classList.remove('status-updating');
+                    rtspReaderStatus.classList.remove('status-updating');
                 });
         }
         

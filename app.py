@@ -630,6 +630,86 @@ def get_postgres_stats() -> Dict[str, Any]:
             conn.close()
         return {'error': f'Error retrieving PostgreSQL statistics: {str(e)}'}
 
+def get_rtsp_reader_stats() -> Dict[str, Any]:
+    """Get RTSP Reader service statistics from health endpoint."""
+    logger.info("📹 Starting get_rtsp_reader_stats()")
+    
+    try:
+        # Make request to RTSP Reader health endpoint
+        response = requests.get('https://rtsp-reader.altfred.com/health', timeout=5)
+        response.raise_for_status()
+        
+        raw_data = response.json()
+        
+        # Structure the data with descriptions and enhanced metrics
+        stats = {
+            'service_info': {
+                'status': raw_data.get('status', 'unknown'),
+                'service': raw_data.get('service', 'rtsp-reader'),
+                'version': raw_data.get('version', 'unknown'),
+                'uptime': {
+                    'value': raw_data.get('uptime', 0),
+                    'formatted': format_uptime(raw_data.get('uptime', 0)),
+                    'description': 'Service uptime in seconds since last restart'
+                }
+            },
+            'streams': {
+                'data': raw_data.get('streams', {}),
+                'total': raw_data.get('streams', {}).get('total', 0),
+                'running': raw_data.get('streams', {}).get('running', 0),
+                'health_status': 'Good' if raw_data.get('streams', {}).get('total', 0) == raw_data.get('streams', {}).get('running', 0) else 'Warning',
+                'description': 'RTSP stream processing status and counts'
+            },
+            'publisher': {
+                'data': raw_data.get('publisher', {}),
+                'connected': raw_data.get('publisher', {}).get('connected', False),
+                'stats': raw_data.get('publisher', {}).get('stats', {}),
+                'description': 'Message publisher connection and performance metrics'
+            },
+            'dynamic_config': {
+                'data': raw_data.get('dynamic_config', {}),
+                'monitoring_enabled': raw_data.get('dynamic_config', {}).get('monitoring', False),
+                'last_check': raw_data.get('dynamic_config', {}).get('last_check', 0),
+                'current_streams': raw_data.get('dynamic_config', {}).get('current_streams', 0),
+                'description': 'Runtime configuration and monitoring status'
+            },
+            'circuit_breaker': {
+                'open': raw_data.get('publisher', {}).get('stats', {}).get('circuit_breaker_open', False),
+                'failures': raw_data.get('publisher', {}).get('stats', {}).get('circuit_breaker_failures', 0),
+                'status': 'Closed' if not raw_data.get('publisher', {}).get('stats', {}).get('circuit_breaker_open', False) else 'Open',
+                'description': 'Publisher circuit breaker protection status'
+            }
+        }
+        
+        logger.info("✅ Successfully gathered RTSP Reader statistics")
+        return stats
+        
+    except requests.exceptions.RequestException as e:
+        logger.error(f"❌ Error connecting to RTSP Reader: {e}")
+        return {'error': f'Cannot connect to RTSP Reader service: {str(e)}'}
+    except Exception as e:
+        logger.error(f"❌ Error getting RTSP Reader stats: {e}")
+        return {'error': f'Error retrieving RTSP Reader statistics: {str(e)}'}
+
+def format_uptime(seconds: float) -> str:
+    """Format uptime seconds into a human-readable string."""
+    if not seconds or seconds <= 0:
+        return 'N/A'
+    
+    days = int(seconds // 86400)
+    hours = int((seconds % 86400) // 3600)
+    minutes = int((seconds % 3600) // 60)
+    secs = int(seconds % 60)
+    
+    if days > 0:
+        return f"{days}d {hours}h {minutes}m {secs}s"
+    elif hours > 0:
+        return f"{hours}h {minutes}m {secs}s"
+    elif minutes > 0:
+        return f"{minutes}m {secs}s"
+    else:
+        return f"{secs}s"
+
 @app.route('/')
 @requires_auth
 def dashboard():
@@ -639,13 +719,15 @@ def dashboard():
 @app.route('/api/stats')
 @requires_auth
 def api_stats():
-    """API endpoint to get all database statistics."""
+    """API endpoint to get all database and service statistics."""
     valkey_stats = get_valkey_stats()
     postgres_stats = get_postgres_stats()
+    rtsp_reader_stats = get_rtsp_reader_stats()
     
     return jsonify({
         'valkey': valkey_stats,
         'postgres': postgres_stats,
+        'rtsp_reader': rtsp_reader_stats,
         'timestamp': datetime.utcnow().isoformat()
     })
 
@@ -667,6 +749,19 @@ def api_valkey():
 def api_postgres():
     """API endpoint to get PostgreSQL statistics."""
     return jsonify(get_postgres_stats())
+
+@app.route('/api/rtsp-reader')
+@requires_auth
+def api_rtsp_reader():
+    """API endpoint to get RTSP Reader service statistics."""
+    logger.info("🌐 API /api/rtsp-reader endpoint called")
+    try:
+        stats = get_rtsp_reader_stats()
+        logger.info(f"📋 Returning RTSP Reader stats: {len(str(stats))} characters")
+        return jsonify(stats)
+    except Exception as e:
+        logger.error(f"❌ Error in /api/rtsp-reader endpoint: {e}")
+        return jsonify({'error': f'API error: {str(e)}'}), 500
 
 @app.route('/observations')
 @requires_auth
