@@ -433,9 +433,8 @@
                 tablesHtml = `
                     <div class="table-stats">
                         <h4 style="margin: 20px 0 10px 0;">📋 Table Statistics & Health</h4>
-                        <div style="margin-bottom: 10px; padding: 10px; background: #f8f9fa; border-radius: 6px; font-size: 13px; color: #666;">
-                            <strong>💡 Live Tuples Explained:</strong> Current number of active/visible rows in each table. 
-                            <strong>Health Status:</strong> Good (&lt;10% dead), Fair (&lt;20% dead), Needs Vacuum (&gt;20% dead)
+                        <div style="margin-bottom: 8px; padding: 6px 10px; background: #f8f9fa; border-radius: 4px; font-size: 11px; color: #666;">
+                            <strong>Live Tuples:</strong> Current active/visible rows. <strong>Health:</strong> Good (&lt;10% dead), Fair (&lt;20% dead), Needs Vacuum (&gt;20% dead)
                         </div>
                         <table>
                             <thead>
@@ -510,42 +509,34 @@
                     <div class="stat-item highlight-metric">
                         <span class="stat-label">Database Size</span>
                         <span class="stat-value">${getValue(data.database_size) || 'N/A'}</span>
-                        <div style="font-size: 11px; color: #666; margin-top: 4px;">Total disk space used</div>
                     </div>
                     <div class="stat-item highlight-metric">
                         <span class="stat-label">Cache Hit Ratio</span>
-                        <span class="stat-value" style="color: ${cacheColor};">${cacheHitRatio || 'N/A'}%</span>
-                        <div style="font-size: 11px; color: ${cacheColor}; margin-top: 4px;">${cacheInterpretation}</div>
+                        <span class="stat-value" style="color: ${cacheColor};">${cacheHitRatio || 'N/A'}% <span style="font-size: 0.8em; font-weight: normal;">${cacheInterpretation}</span></span>
                     </div>
                     <div class="stat-item">
                         <span class="stat-label">Active Connections</span>
-                        <span class="stat-value">${formatNumber(getValue(getData(data.connections)?.active_connections))}</span>
-                        <div style="font-size: 11px; color: #666; margin-top: 4px;">of ${formatNumber(getValue(getData(data.connections)?.total_connections))} total</div>
+                        <span class="stat-value">${formatNumber(getValue(getData(data.connections)?.active_connections))} <span style="font-size: 0.7em; font-weight: normal; color: #666;">/ ${formatNumber(getValue(getData(data.connections)?.total_connections))}</span></span>
                     </div>
                     <div class="stat-item">
                         <span class="stat-label">Idle in Transaction</span>
                         <span class="stat-value" style="color: ${getValue(getData(data.connections)?.idle_in_transaction) > 0 ? '#f39c12' : '#28a745'};">${formatNumber(getValue(getData(data.connections)?.idle_in_transaction))}</span>
-                        <div style="font-size: 11px; color: #666; margin-top: 4px;">Should be low</div>
                     </div>
                     <div class="stat-item">
                         <span class="stat-label">Rollback Ratio</span>
                         <span class="stat-value" style="color: ${getValue(data.activity?.rollback_ratio) > 5 ? '#f39c12' : '#28a745'};">${getValue(data.activity?.rollback_ratio) || 0}%</span>
-                        <div style="font-size: 11px; color: #666; margin-top: 4px;">Lower is better</div>
                     </div>
                     <div class="stat-item">
                         <span class="stat-label">Blocks Read (Disk)</span>
                         <span class="stat-value">${formatNumber(getValue(getData(data.activity)?.blocks_read))}</span>
-                        <div style="font-size: 11px; color: #666; margin-top: 4px;">Slower I/O operations</div>
                     </div>
                     <div class="stat-item">
                         <span class="stat-label">Blocks Hit (Memory)</span>
                         <span class="stat-value">${formatNumber(getValue(getData(data.activity)?.blocks_hit))}</span>
-                        <div style="font-size: 11px; color: #666; margin-top: 4px;">Faster memory access</div>
                     </div>
                     <div class="stat-item">
                         <span class="stat-label">Tuples Returned</span>
                         <span class="stat-value">${formatNumber(getValue(getData(data.activity)?.tuples_returned))}</span>
-                        <div style="font-size: 11px; color: #666; margin-top: 4px;">Rows returned by queries</div>
                     </div>
                 </div>
                 ${appMetricsHtml}
@@ -554,6 +545,17 @@
                     <strong>📈 Performance Insights:</strong> 
                     Cache Hit Ratio: ${data.cache_hit_ratio?.interpretation || 'Higher values indicate better memory utilization'}.
                     ${getValue(data.summary?.tables_needing_maintenance) > 0 ? `⚠️ ${getValue(data.summary.tables_needing_maintenance)} tables would benefit from VACUUM.` : '✅ All tables are healthy.'}
+                </div>
+                <div style="margin-top: 15px; padding: 12px; background: #f1f3f4; border-radius: 6px; font-size: 11px; color: #666; line-height: 1.4;">
+                    <strong>📚 Metric Explanations:</strong><br>
+                    • <strong>Database Size:</strong> Total disk space used including all tables, indexes, and data<br>
+                    • <strong>Cache Hit Ratio:</strong> % of data found in memory vs read from disk (>95% excellent, 90-95% good, <90% needs attention)<br>
+                    • <strong>Active Connections:</strong> Database connections currently executing queries<br>
+                    • <strong>Idle in Transaction:</strong> Connections holding open transactions (should be low)<br>
+                    • <strong>Rollback Ratio:</strong> % of transactions that failed (lower is better, <5% is good)<br>
+                    • <strong>Blocks Read (Disk):</strong> Data blocks read from slower disk storage<br>
+                    • <strong>Blocks Hit (Memory):</strong> Data blocks found in faster memory cache<br>
+                    • <strong>Tuples Returned:</strong> Total number of rows returned by all queries
                 </div>
             `;
         }
