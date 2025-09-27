@@ -160,32 +160,32 @@
         }
 
         .stat-item {
-            margin-bottom: 12px;
-            padding: 16px;
-            background: #f7fafc;
-            border-radius: 8px;
-            border-left: 3px solid #e2e8f0;
+            padding: 12px;
+            background: white;
+            border-radius: 6px;
+            border: 1px solid #e2e8f0;
+            text-align: center;
         }
 
         .stat-label {
             font-weight: 500;
             color: #4a5568;
             display: block;
-            margin-bottom: 4px;
-            font-size: 13px;
+            margin-bottom: 6px;
+            font-size: 12px;
         }
 
         .stat-value {
-            font-size: 1.25rem;
+            font-size: 1.4rem;
             color: #2d3748;
             font-weight: 600;
         }
 
         .stat-grid {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-            gap: 15px;
-            margin-bottom: 20px;
+            grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+            gap: 12px;
+            margin-bottom: 16px;
         }
 
         .loading {
@@ -227,12 +227,12 @@
         }
 
         .highlight-metric {
-            background: #edf2f7;
-            border-left: 3px solid #4299e1;
+            background: #f0f9ff;
+            border: 1px solid #7dd3fc;
         }
 
         .highlight-metric .stat-value {
-            color: #2b6cb0;
+            color: #0369a1;
         }
 
         .last-updated {
@@ -515,6 +515,8 @@
             const cacheInterpretation = cacheHitRatio >= 95 ? 'Excellent' : cacheHitRatio >= 90 ? 'Good' : 'Needs Attention';
 
             container.innerHTML = `
+                ${tablesHtml}
+                ${appMetricsHtml}
                 <div class="stat-grid">
                     <div class="stat-item highlight-metric">
                         <span class="stat-label">Database Size</span>
@@ -522,11 +524,13 @@
                     </div>
                     <div class="stat-item highlight-metric">
                         <span class="stat-label">Cache Hit Ratio</span>
-                        <span class="stat-value" style="color: ${cacheColor};">${cacheHitRatio || 'N/A'}% <span style="font-size: 0.8em; font-weight: normal;">${cacheInterpretation}</span></span>
+                        <span class="stat-value" style="color: ${cacheColor};">${cacheHitRatio || 'N/A'}%</span>
+                        <div style="font-size: 10px; color: ${cacheColor}; margin-top: 2px;">${cacheInterpretation}</div>
                     </div>
                     <div class="stat-item">
                         <span class="stat-label">Active Connections</span>
-                        <span class="stat-value">${formatNumber(getValue(getData(data.connections)?.active_connections))} <span style="font-size: 0.7em; font-weight: normal; color: #666;">/ ${formatNumber(getValue(getData(data.connections)?.total_connections))}</span></span>
+                        <span class="stat-value">${formatNumber(getValue(getData(data.connections)?.active_connections))}</span>
+                        <div style="font-size: 10px; color: #666; margin-top: 2px;">of ${formatNumber(getValue(getData(data.connections)?.total_connections))}</div>
                     </div>
                     <div class="stat-item">
                         <span class="stat-label">Idle in Transaction</span>
@@ -537,20 +541,20 @@
                         <span class="stat-value" style="color: ${getValue(data.activity?.rollback_ratio) > 5 ? '#f39c12' : '#28a745'};">${getValue(data.activity?.rollback_ratio) || 0}%</span>
                     </div>
                     <div class="stat-item">
-                        <span class="stat-label">Blocks Read (Disk)</span>
+                        <span class="stat-label">Blocks Read</span>
                         <span class="stat-value">${formatNumber(getValue(getData(data.activity)?.blocks_read))}</span>
+                        <div style="font-size: 10px; color: #666; margin-top: 2px;">Disk</div>
                     </div>
                     <div class="stat-item">
-                        <span class="stat-label">Blocks Hit (Memory)</span>
+                        <span class="stat-label">Blocks Hit</span>
                         <span class="stat-value">${formatNumber(getValue(getData(data.activity)?.blocks_hit))}</span>
+                        <div style="font-size: 10px; color: #666; margin-top: 2px;">Memory</div>
                     </div>
                     <div class="stat-item">
                         <span class="stat-label">Tuples Returned</span>
                         <span class="stat-value">${formatNumber(getValue(getData(data.activity)?.tuples_returned))}</span>
                     </div>
                 </div>
-                ${appMetricsHtml}
-                ${tablesHtml}
             `;
         }
 
