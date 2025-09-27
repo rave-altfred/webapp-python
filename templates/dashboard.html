@@ -400,82 +400,161 @@
             
             // Helper function to extract value from enhanced structure
             const getValue = (obj) => obj?.value !== undefined ? obj.value : obj;
+            const getData = (obj) => obj?.data || obj;
 
+            // Build summary metrics section
+            const summaryHtml = data.summary ? `
+                <div style="margin-bottom: 25px; padding: 20px; background: linear-gradient(135deg, #f8f9fa, #e9ecef); border-radius: 12px; border-left: 5px solid #28a745;">
+                    <h4 style="margin: 0 0 15px 0; color: #28a745; font-size: 1.1rem;">📊 Database Health Summary</h4>
+                    <div class="stat-grid" style="grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 10px;">
+                        <div style="padding: 8px; background: white; border-radius: 6px;">
+                            <div style="font-size: 12px; color: #666; font-weight: 600;">TOTAL ACTIVE ROWS</div>
+                            <div style="font-size: 1.2rem; font-weight: 600; color: #2c3e50;">${formatNumber(getValue(data.summary.total_live_rows))}</div>
+                        </div>
+                        <div style="padding: 8px; background: white; border-radius: 6px;">
+                            <div style="font-size: 12px; color: #666; font-weight: 600;">DEAD ROWS</div>
+                            <div style="font-size: 1.2rem; font-weight: 600; color: ${getValue(data.summary.total_dead_rows) > 0 ? '#e74c3c' : '#28a745'};">${formatNumber(getValue(data.summary.total_dead_rows))}</div>
+                        </div>
+                        <div style="padding: 8px; background: white; border-radius: 6px;">
+                            <div style="font-size: 12px; color: #666; font-weight: 600;">TABLES NEED VACUUM</div>
+                            <div style="font-size: 1.2rem; font-weight: 600; color: ${getValue(data.summary.tables_needing_maintenance) > 0 ? '#f39c12' : '#28a745'};">${getValue(data.summary.tables_needing_maintenance)}</div>
+                        </div>
+                        <div style="padding: 8px; background: white; border-radius: 6px;">
+                            <div style="font-size: 12px; color: #666; font-weight: 600;">OVERALL HEALTH</div>
+                            <div style="font-size: 1rem; font-weight: 600; color: ${getValue(data.summary.overall_health) === 'Good' ? '#28a745' : '#f39c12'};">${getValue(data.summary.overall_health)}</div>
+                        </div>
+                    </div>
+                </div>
+            ` : '';
+
+            // Build enhanced table statistics with health indicators
             let tablesHtml = '';
-            if (data.tables && data.tables.length > 0) {
+            if (data.tables && data.tables.data && data.tables.data.length > 0) {
                 tablesHtml = `
                     <div class="table-stats">
-                        <h4>Table Statistics</h4>
+                        <h4 style="margin: 20px 0 10px 0;">📋 Table Statistics & Health</h4>
+                        <div style="margin-bottom: 10px; padding: 10px; background: #f8f9fa; border-radius: 6px; font-size: 13px; color: #666;">
+                            <strong>💡 Live Tuples Explained:</strong> Current number of active/visible rows in each table. 
+                            <strong>Health Status:</strong> Good (&lt;10% dead), Fair (&lt;20% dead), Needs Vacuum (&gt;20% dead)
+                        </div>
                         <table>
                             <thead>
                                 <tr>
                                     <th>Table</th>
-                                    <th>Live Tuples</th>
-                                    <th>Inserts</th>
-                                    <th>Updates</th>
-                                    <th>Deletes</th>
+                                    <th title="Current active/visible rows">Live Tuples</th>
+                                    <th title="Rows waiting for cleanup">Dead Tuples</th>
+                                    <th title="Table health based on dead/live ratio">Health</th>
+                                    <th title="Total INSERT operations">Inserts</th>
+                                    <th title="Total UPDATE operations">Updates</th>
+                                    <th title="Total DELETE operations">Deletes</th>
+                                    <th>Size</th>
                                 </tr>
                             </thead>
                             <tbody>
-                                ${data.tables.slice(0, 10).map(table => `
-                                    <tr>
-                                        <td>${table.tablename}</td>
-                                        <td>${formatNumber(table.live_tuples)}</td>
-                                        <td>${formatNumber(table.inserts)}</td>
-                                        <td>${formatNumber(table.updates)}</td>
-                                        <td>${formatNumber(table.deletes)}</td>
-                                    </tr>
-                                `).join('')}
+                                ${data.tables.data.slice(0, 10).map(table => {
+                                    const healthColor = table.health_status === 'Good' ? '#28a745' : 
+                                                       table.health_status === 'Fair' ? '#f39c12' : '#e74c3c';
+                                    const healthBg = table.health_status === 'Good' ? '#d4edda' : 
+                                                     table.health_status === 'Fair' ? '#fff3cd' : '#f8d7da';
+                                    return `
+                                        <tr>
+                                            <td><strong>${table.tablename}</strong></td>
+                                            <td>${formatNumber(table.live_tuples)}</td>
+                                            <td style="color: ${table.dead_tuples > 0 ? '#e74c3c' : '#666'};">${formatNumber(table.dead_tuples)}</td>
+                                            <td>
+                                                <span style="background: ${healthBg}; color: ${healthColor}; padding: 2px 8px; border-radius: 12px; font-size: 11px; font-weight: 600;">
+                                                    ${table.health_status}
+                                                </span>
+                                                ${table.bloat_percentage > 0 ? `<br><span style="font-size: 10px; color: #666;">${table.bloat_percentage}% bloat</span>` : ''}
+                                            </td>
+                                            <td>${formatNumber(table.inserts)}</td>
+                                            <td>${formatNumber(table.updates)}</td>
+                                            <td>${formatNumber(table.deletes)}</td>
+                                            <td>${table.table_size || 'N/A'}</td>
+                                        </tr>
+                                    `;
+                                }).join('')}
                             </tbody>
                         </table>
                     </div>
                 `;
             }
 
+            // Application metrics section
+            let appMetricsHtml = '';
+            if (data.application_metrics && data.application_metrics.data) {
+                const appData = data.application_metrics.data;
+                if (appData.total_observations > 0) {
+                    appMetricsHtml = `
+                        <div style="margin: 20px 0; padding: 15px; background: #e8f4fd; border-radius: 8px; border-left: 4px solid #007bff;">
+                            <h4 style="margin: 0 0 10px 0; color: #007bff;">🔍 Application Metrics (Observations)</h4>
+                            <div class="stat-grid" style="grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px;">
+                                <div><span style="font-weight: 600;">Total:</span> ${formatNumber(appData.total_observations)}</div>
+                                <div><span style="font-weight: 600;">Last 24h:</span> ${formatNumber(appData.recent_observations)}</div>
+                                <div><span style="font-weight: 600;">Last Hour:</span> ${formatNumber(appData.hourly_observations)}</div>
+                                <div><span style="font-weight: 600;">Object Types:</span> ${formatNumber(appData.unique_object_types)}</div>
+                            </div>
+                        </div>
+                    `;
+                }
+            }
+
+            // Cache hit ratio interpretation
+            const cacheHitRatio = getValue(data.cache_hit_ratio);
+            const cacheColor = cacheHitRatio >= 95 ? '#28a745' : cacheHitRatio >= 90 ? '#f39c12' : '#e74c3c';
+            const cacheInterpretation = cacheHitRatio >= 95 ? 'Excellent' : cacheHitRatio >= 90 ? 'Good' : 'Needs Attention';
+
             container.innerHTML = `
+                ${summaryHtml}
                 <div class="stat-grid">
                     <div class="stat-item highlight-metric">
                         <span class="stat-label">Database Size</span>
                         <span class="stat-value">${getValue(data.database_size) || 'N/A'}</span>
+                        <div style="font-size: 11px; color: #666; margin-top: 4px;">Total disk space used</div>
                     </div>
                     <div class="stat-item highlight-metric">
                         <span class="stat-label">Cache Hit Ratio</span>
-                        <span class="stat-value">${getValue(data.cache_hit_ratio) || 'N/A'}%</span>
-                    </div>
-                    <div class="stat-item">
-                        <span class="stat-label">Total Connections</span>
-                        <span class="stat-value">${formatNumber(getValue(data.connections?.total_connections))}</span>
+                        <span class="stat-value" style="color: ${cacheColor};">${cacheHitRatio || 'N/A'}%</span>
+                        <div style="font-size: 11px; color: ${cacheColor}; margin-top: 4px;">${cacheInterpretation}</div>
                     </div>
                     <div class="stat-item">
                         <span class="stat-label">Active Connections</span>
-                        <span class="stat-value">${formatNumber(getValue(data.connections?.active_connections))}</span>
+                        <span class="stat-value">${formatNumber(getValue(getData(data.connections)?.active_connections))}</span>
+                        <div style="font-size: 11px; color: #666; margin-top: 4px;">of ${formatNumber(getValue(getData(data.connections)?.total_connections))} total</div>
                     </div>
                     <div class="stat-item">
-                        <span class="stat-label">Committed Transactions</span>
-                        <span class="stat-value">${formatNumber(getValue(data.activity?.committed_transactions))}</span>
+                        <span class="stat-label">Idle in Transaction</span>
+                        <span class="stat-value" style="color: ${getValue(getData(data.connections)?.idle_in_transaction) > 0 ? '#f39c12' : '#28a745'};">${formatNumber(getValue(getData(data.connections)?.idle_in_transaction))}</span>
+                        <div style="font-size: 11px; color: #666; margin-top: 4px;">Should be low</div>
                     </div>
                     <div class="stat-item">
-                        <span class="stat-label">Rolled Back Transactions</span>
-                        <span class="stat-value">${formatNumber(getValue(data.activity?.rolled_back_transactions))}</span>
+                        <span class="stat-label">Rollback Ratio</span>
+                        <span class="stat-value" style="color: ${getValue(data.activity?.rollback_ratio) > 5 ? '#f39c12' : '#28a745'};">${getValue(data.activity?.rollback_ratio) || 0}%</span>
+                        <div style="font-size: 11px; color: #666; margin-top: 4px;">Lower is better</div>
                     </div>
                     <div class="stat-item">
-                        <span class="stat-label">Tuples Inserted</span>
-                        <span class="stat-value">${formatNumber(getValue(data.activity?.tuples_inserted))}</span>
+                        <span class="stat-label">Blocks Read (Disk)</span>
+                        <span class="stat-value">${formatNumber(getValue(getData(data.activity)?.blocks_read))}</span>
+                        <div style="font-size: 11px; color: #666; margin-top: 4px;">Slower I/O operations</div>
                     </div>
                     <div class="stat-item">
-                        <span class="stat-label">Tuples Updated</span>
-                        <span class="stat-value">${formatNumber(getValue(data.activity?.tuples_updated))}</span>
+                        <span class="stat-label">Blocks Hit (Memory)</span>
+                        <span class="stat-value">${formatNumber(getValue(getData(data.activity)?.blocks_hit))}</span>
+                        <div style="font-size: 11px; color: #666; margin-top: 4px;">Faster memory access</div>
                     </div>
                     <div class="stat-item">
-                        <span class="stat-label">Tuples Deleted</span>
-                        <span class="stat-value">${formatNumber(getValue(data.activity?.tuples_deleted))}</span>
-                    </div>
-                    <div class="stat-item">
-                        <span class="stat-label">Recent Activities (24h)</span>
-                        <span class="stat-value">${formatNumber(getValue(data.recent_activities))}</span>
+                        <span class="stat-label">Tuples Returned</span>
+                        <span class="stat-value">${formatNumber(getValue(getData(data.activity)?.tuples_returned))}</span>
+                        <div style="font-size: 11px; color: #666; margin-top: 4px;">Rows returned by queries</div>
                     </div>
                 </div>
+                ${appMetricsHtml}
                 ${tablesHtml}
+                <div style="margin-top: 20px; padding: 15px; background: #f8f9fa; border-radius: 8px; font-size: 14px; color: #666;">
+                    <strong>📈 Performance Insights:</strong> 
+                    Cache Hit Ratio: ${data.cache_hit_ratio?.interpretation || 'Higher values indicate better memory utilization'}.
+                    ${getValue(data.summary?.tables_needing_maintenance) > 0 ? `⚠️ ${getValue(data.summary.tables_needing_maintenance)} tables would benefit from VACUUM.` : '✅ All tables are healthy.'}
+                </div>
             `;
         }
 
