@@ -769,6 +769,58 @@ def observations_page():
     """Observations page."""
     return render_template('observations.html')
 
+@app.route('/api/clients')
+@requires_auth
+def api_clients():
+    """API endpoint to get distinct client IDs with observation counts."""
+    logger.info("🔍 API /api/clients endpoint called")
+    
+    conn = get_postgres_connection()
+    if not conn:
+        return jsonify({'error': 'Cannot connect to PostgreSQL database'}), 503
+        
+    try:
+        cursor = conn.cursor(cursor_factory=RealDictCursor)
+        
+        # Get distinct client IDs with counts and latest observation
+        cursor.execute("""
+            SELECT 
+                client_id,
+                COUNT(*) as observation_count,
+                MAX(created_at) as last_observation,
+                COUNT(DISTINCT object_class) as object_types,
+                AVG(confidence) as avg_confidence
+            FROM observations 
+            WHERE client_id IS NOT NULL AND client_id != ''
+            GROUP BY client_id
+            ORDER BY MAX(created_at) DESC
+        """)
+        
+        clients = []
+        for row in cursor.fetchall():
+            client_data = dict(row)
+            # Format the last observation timestamp
+            if client_data['last_observation']:
+                client_data['last_observation'] = client_data['last_observation'].isoformat()
+            # Round average confidence
+            if client_data['avg_confidence']:
+                client_data['avg_confidence'] = round(float(client_data['avg_confidence']), 3)
+            clients.append(client_data)
+        
+        cursor.close()
+        conn.close()
+        
+        return jsonify({
+            'clients': clients,
+            'total_clients': len(clients)
+        })
+        
+    except Exception as e:
+        logger.error(f"❌ Error getting clients: {e}")
+        if conn:
+            conn.close()
+        return jsonify({'error': f'Error retrieving clients: {str(e)}'}), 500
+
 @app.route('/api/observations')
 @requires_auth
 def api_observations():
@@ -804,15 +856,47 @@ def api_observations():
         params = []
         
         if search:
-            # Search across multiple text fields
-            search_fields = [
-                'job_id', 'client_id', 'stream_id', 'observation_type', 'object_class'
-            ]
-            search_conditions = []
-            for field in search_fields:
-                search_conditions.append(f"{field}::text ILIKE %s")
-                params.append(f'%{search}%')
-            where_conditions.append(f"({' OR '.join(search_conditions)})")
+            # Handle special client_id filter syntax: client_id:value
+            if search.startswith('client_id:'):
+                client_id = search.replace('client_id:', '').strip()
+                where_conditions.append("client_id = %s")
+                params.append(client_id)
+            elif 'client_id:' in search:
+                # Handle mixed search with client filter
+                parts = search.split()
+                client_filter = None
+                search_terms = []
+                
+                for part in parts:
+                    if part.startswith('client_id:'):
+                        client_filter = part.replace('client_id:', '').strip()
+                    else:
+                        search_terms.append(part)
+                
+                if client_filter:
+                    where_conditions.append("client_id = %s")
+                    params.append(client_filter)
+                
+                if search_terms:
+                    search_text = ' '.join(search_terms)
+                    search_fields = [
+                        'job_id', 'stream_id', 'observation_type', 'object_class'
+                    ]
+                    search_conditions = []
+                    for field in search_fields:
+                        search_conditions.append(f"{field}::text ILIKE %s")
+                        params.append(f'%{search_text}%')
+                    where_conditions.append(f"({' OR '.join(search_conditions)})")
+            else:
+                # Regular search across multiple text fields
+                search_fields = [
+                    'job_id', 'client_id', 'stream_id', 'observation_type', 'object_class'
+                ]
+                search_conditions = []
+                for field in search_fields:
+                    search_conditions.append(f"{field}::text ILIKE %s")
+                    params.append(f'%{search}%')
+                where_conditions.append(f"({' OR '.join(search_conditions)})")
         
         where_clause = 'WHERE ' + ' AND '.join(where_conditions) if where_conditions else ''
         

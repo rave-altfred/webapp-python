@@ -367,7 +367,120 @@
             display: none;
         }
 
+        .client-selection {
+            background: white;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 20px;
+            border: 1px solid #e2e8f0;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+        }
+
+        .client-selection h2 {
+            color: #2d3748;
+            font-size: 1.5rem;
+            margin: 0 0 16px 0;
+            font-weight: 600;
+        }
+
+        .client-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+            gap: 16px;
+            margin-top: 16px;
+        }
+
+        .client-card {
+            background: white;
+            border: 2px solid #e2e8f0;
+            border-radius: 8px;
+            padding: 16px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            position: relative;
+        }
+
+        .client-card:hover {
+            border-color: #4299e1;
+            box-shadow: 0 4px 12px rgba(66, 153, 225, 0.1);
+            transform: translateY(-2px);
+        }
+
+        .client-card.selected {
+            border-color: #4299e1;
+            background: #f0f9ff;
+        }
+
+        .client-name {
+            font-size: 1.1rem;
+            font-weight: 600;
+            color: #2d3748;
+            margin-bottom: 8px;
+        }
+
+        .client-stats {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 8px;
+            font-size: 14px;
+            color: #718096;
+        }
+
+        .client-stat {
+            display: flex;
+            justify-content: space-between;
+        }
+
+        .client-stat-label {
+            font-weight: 500;
+        }
+
+        .client-stat-value {
+            color: #4299e1;
+            font-weight: 600;
+        }
+
+        .client-last-seen {
+            margin-top: 8px;
+            font-size: 12px;
+            color: #a0aec0;
+        }
+
+        .back-to-clients {
+            background: #718096;
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+            margin-right: 16px;
+            transition: background-color 0.2s ease;
+        }
+
+        .back-to-clients:hover {
+            background: #4a5568;
+        }
+
+        .selected-client-info {
+            background: #e6fffa;
+            border: 1px solid #81e6d9;
+            border-radius: 6px;
+            padding: 12px 16px;
+            margin-bottom: 16px;
+            font-size: 14px;
+            color: #234e52;
+        }
+
+        .selected-client-name {
+            font-weight: 600;
+            color: #1a202c;
+        }
+
         @media (max-width: 768px) {
+            .client-grid {
+                grid-template-columns: 1fr;
+            }
             .controls-row {
                 flex-direction: column;
                 align-items: stretch;
@@ -412,19 +525,35 @@
             </div>
         </div>
 
-        <div class="controls-panel">
-            <div class="controls-row">
-                <div class="search-box">
-                    <input type="text" id="searchInput" placeholder="🔍 Search observations (job_id, client_id, object_class, etc.)">
-                </div>
-                <select id="pageSizeSelect" class="page-size-select">
-                    <option value="25">25 per page</option>
-                    <option value="50" selected>50 per page</option>
-                    <option value="100">100 per page</option>
-                    <option value="200">200 per page</option>
-                </select>
-                <button class="refresh-btn" onclick="loadObservations()">🔄 Refresh</button>
+        <!-- Client Selection Section -->
+        <div id="clientSelection" class="client-selection">
+            <h2>👥 Select Client</h2>
+            <p style="color: #718096; margin-bottom: 16px;">Choose a client to view their observations</p>
+            <div id="clientsLoading" class="loading">Loading clients...</div>
+            <div id="clientsError" class="error" style="display: none;"></div>
+            <div id="clientGrid" class="client-grid" style="display: none;"></div>
+        </div>
+
+        <!-- Observations Section (hidden initially) -->
+        <div id="observationsSection" style="display: none;">
+            <div class="selected-client-info">
+                <button class="back-to-clients" onclick="showClientSelection()">← Back to Clients</button>
+                Viewing observations for: <span class="selected-client-name" id="selectedClientName"></span>
             </div>
+            
+            <div class="controls-panel">
+                <div class="controls-row">
+                    <div class="search-box">
+                        <input type="text" id="searchInput" placeholder="🔍 Search observations (job_id, object_class, etc.)">
+                    </div>
+                    <select id="pageSizeSelect" class="page-size-select">
+                        <option value="25">25 per page</option>
+                        <option value="50" selected>50 per page</option>
+                        <option value="100">100 per page</option>
+                        <option value="200">200 per page</option>
+                    </select>
+                    <button class="refresh-btn" onclick="loadObservations()">🔄 Refresh</button>
+                </div>
             
             <div class="column-controls">
                 <strong>Show/Hide Columns:</strong>
@@ -501,6 +630,7 @@
                 </div>
             </div>
         </div>
+        </div>
     </div>
 
     <!-- Image Modal -->
@@ -516,6 +646,8 @@
         let currentOrder = 'desc';
         let currentPageSize = 50;
         let currentData = null;
+        let selectedClientId = null;
+        let clientsData = null;
 
         // Column definitions
         const columns = [
@@ -686,7 +818,99 @@
             }
         }
 
+        function loadClients() {
+            document.getElementById('clientsLoading').style.display = 'block';
+            document.getElementById('clientsError').style.display = 'none';
+            document.getElementById('clientGrid').style.display = 'none';
+            
+            fetch('/api/clients')
+                .then(response => response.json())
+                .then(data => {
+                    if (data.error) {
+                        throw new Error(data.error);
+                    }
+                    
+                    clientsData = data;
+                    renderClients(data.clients);
+                    
+                    document.getElementById('clientsLoading').style.display = 'none';
+                    document.getElementById('clientGrid').style.display = 'block';
+                })
+                .catch(error => {
+                    console.error('Error loading clients:', error);
+                    document.getElementById('clientsError').textContent = `Error loading clients: ${error.message}`;
+                    document.getElementById('clientsError').style.display = 'block';
+                    document.getElementById('clientsLoading').style.display = 'none';
+                });
+        }
+        
+        function renderClients(clients) {
+            const grid = document.getElementById('clientGrid');
+            grid.innerHTML = '';
+            
+            clients.forEach(client => {
+                const card = document.createElement('div');
+                card.className = 'client-card';
+                card.onclick = () => selectClient(client.client_id);
+                
+                const lastSeen = client.last_observation ? new Date(client.last_observation).toLocaleString() : 'Never';
+                const avgConfidence = client.avg_confidence ? Math.round(client.avg_confidence * 100) + '%' : 'N/A';
+                
+                card.innerHTML = `
+                    <div class="client-name">${client.client_id}</div>
+                    <div class="client-stats">
+                        <div class="client-stat">
+                            <span class="client-stat-label">Observations:</span>
+                            <span class="client-stat-value">${client.observation_count.toLocaleString()}</span>
+                        </div>
+                        <div class="client-stat">
+                            <span class="client-stat-label">Object Types:</span>
+                            <span class="client-stat-value">${client.object_types}</span>
+                        </div>
+                        <div class="client-stat">
+                            <span class="client-stat-label">Avg Confidence:</span>
+                            <span class="client-stat-value">${avgConfidence}</span>
+                        </div>
+                    </div>
+                    <div class="client-last-seen">Last seen: ${lastSeen}</div>
+                `;
+                
+                grid.appendChild(card);
+            });
+        }
+        
+        function selectClient(clientId) {
+            selectedClientId = clientId;
+            document.getElementById('selectedClientName').textContent = clientId;
+            
+            // Hide client selection and show observations section
+            document.getElementById('clientSelection').style.display = 'none';
+            document.getElementById('observationsSection').style.display = 'block';
+            
+            // Reset pagination and search for new client
+            currentPage = 1;
+            currentSearch = '';
+            document.getElementById('searchInput').value = '';
+            
+            // Load observations for selected client
+            loadObservations();
+        }
+        
+        function showClientSelection() {
+            // Hide observations section and show client selection
+            document.getElementById('observationsSection').style.display = 'none';
+            document.getElementById('clientSelection').style.display = 'block';
+            
+            // Clear selected client
+            selectedClientId = null;
+        }
+
         function loadObservations() {
+            if (!selectedClientId) {
+                console.error('No client selected');
+                return;
+            }
+            
             document.getElementById('loadingMessage').style.display = 'block';
             document.getElementById('errorMessage').style.display = 'none';
             document.getElementById('tableContent').style.display = 'none';
@@ -698,6 +922,11 @@
                 sort: currentSort,
                 order: currentOrder
             });
+            
+            // Add client filter to search
+            const clientSearch = `client_id:${selectedClientId}`;
+            const fullSearch = currentSearch ? `${currentSearch} ${clientSearch}` : clientSearch;
+            params.set('search', fullSearch);
             
             fetch(`/api/observations?${params}`)
                 .then(response => response.json())
@@ -787,8 +1016,8 @@
                 }
             };
             
-            // Load initial data
-            loadObservations();
+            // Load initial client data instead of observations
+            loadClients();
         });
     </script>
 </body>
