@@ -365,6 +365,17 @@ def get_queue_info_with_timeout(client, timeout_seconds=10) -> Dict[str, Any]:
                             'length': length,
                             'type': 'set'
                         })
+                elif key_type == 'stream':
+                    # Redis Streams are commonly used for message queues
+                    length = client.xlen(key)
+                    logger.info(f"Stream key '{key}' has length: {length}")
+                    if length > 0:
+                        total_messages += length
+                        queue_details.append({
+                            'name': key,
+                            'length': length,
+                            'type': 'stream'
+                        })
                 else:
                     logger.info(f"Key '{key}' has unsupported type '{key_type}' for queue detection")
             except Exception as e:
