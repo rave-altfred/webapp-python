@@ -269,6 +269,21 @@ def get_queue_info_with_timeout(client, timeout_seconds=10) -> Dict[str, Any]:
             'rq:*',             # Python RQ pattern
             'bull:*',           # Bull.js pattern
             'kue:*',            # Kue pattern
+            'snapshots',        # Based on sample keys found
+            'snapshot:*',       # Snapshot variations
+            'frames',           # Frame queue pattern
+            'frame:*',          # Frame variations
+            'images',           # Image queue pattern
+            'image:*',          # Image variations
+            'messages',         # Generic message queue
+            'message:*',        # Message variations
+            'data',             # Generic data queue
+            'data:*',           # Data variations
+            'buffer',           # Buffer queue
+            'buffer:*',         # Buffer variations
+            '*_queue',          # Suffix queue pattern
+            '*_jobs',           # Suffix jobs pattern
+            '*_tasks',          # Suffix tasks pattern
         ]
         
         total_messages = 0
