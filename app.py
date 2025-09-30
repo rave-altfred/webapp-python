@@ -241,6 +241,174 @@ def get_postgres_connection():
         logger.error(f"❌ Error connecting to PostgreSQL: {e}")
         return None
 
+def get_queue_info_with_timeout(client, timeout_seconds=10) -> Dict[str, Any]:
+    """Get queue information with timeout protection to prevent hanging."""
+    import signal
+    import time
+    
+    def timeout_handler(signum, frame):
+        raise TimeoutError("Queue scan timed out")
+    
+    try:
+        # Set up timeout
+        signal.signal(signal.SIGALRM, timeout_handler)
+        signal.alarm(timeout_seconds)
+        
+        logger.info(f"Starting queue scan with {timeout_seconds}s timeout...")
+        
+        # Common queue patterns used in Redis/Valkey applications
+        queue_patterns = [
+            'queue:*',          # Standard queue pattern
+            '*:queue',          # Alternative queue pattern
+            'job:*',            # Job queue pattern
+            'task:*',           # Task queue pattern
+            'work:*',           # Work queue pattern
+            'pending:*',        # Pending work pattern
+            'processing:*',     # Currently processing pattern
+            'celery',           # Celery default queue
+            'rq:*',             # Python RQ pattern
+            'bull:*',           # Bull.js pattern
+            'kue:*',            # Kue pattern
+        ]
+        
+        total_messages = 0
+        queue_details = []
+        
+        # First, try to get all keys matching queue patterns
+        all_queue_keys = set()
+        for pattern in queue_patterns:
+            try:
+                # Use SCAN instead of KEYS for better performance
+                cursor = 0
+                while True:
+                    cursor, keys = client.scan(cursor=cursor, match=pattern, count=100)
+                    all_queue_keys.update(keys)
+                    if cursor == 0:
+                        break
+                    # Additional safety check within the loop
+                    if time.time() % 1 == 0:  # Check every ~1 second worth of operations
+                        signal.alarm(timeout_seconds)  # Reset timeout
+            except Exception as e:
+                logger.warning(f"Error scanning pattern {pattern}: {e}")
+                continue
+        
+        logger.info(f"Found {len(all_queue_keys)} potential queue keys")
+        
+        # Check each key to see if it's actually a queue (list) and get its length
+        for key in list(all_queue_keys)[:50]:  # Limit to first 50 keys to prevent long scans
+            try:
+                key_type = client.type(key)
+                if key_type == 'list':
+                    length = client.llen(key)
+                    if length > 0:
+                        total_messages += length
+                        queue_details.append({
+                            'name': key,
+                            'length': length,
+                            'type': 'list'
+                        })
+                elif key_type == 'zset':
+                    # Sorted sets are sometimes used for delayed queues
+                    length = client.zcard(key)
+                    if length > 0:
+                        total_messages += length
+                        queue_details.append({
+                            'name': key,
+                            'length': length,
+                            'type': 'sorted_set'
+                        })
+                elif key_type == 'set':
+                    # Sets might be used for unique job tracking
+                    length = client.scard(key)
+                    if length > 0:
+                        total_messages += length
+                        queue_details.append({
+                            'name': key,
+                            'length': length,
+                            'type': 'set'
+                        })
+            except Exception as e:
+                logger.warning(f"Error checking key {key}: {e}")
+                continue
+        
+        # Cancel the alarm
+        signal.alarm(0)
+        
+        # Sort queue details by length (descending)
+        queue_details.sort(key=lambda x: x['length'], reverse=True)
+        
+        # Calculate estimated processing time
+        estimated_time = "N/A"
+        if total_messages > 0:
+            # Use the instantaneous ops per second, but provide a conservative estimate
+            ops_per_sec = client.info().get('instantaneous_ops_per_sec', 0)
+            if ops_per_sec > 0:
+                # Assume a portion of ops are queue processing (conservative estimate: 50%)
+                queue_processing_rate = max(1, ops_per_sec * 0.5)
+                estimated_seconds = total_messages / queue_processing_rate
+                if estimated_seconds < 60:
+                    estimated_time = f"{int(estimated_seconds)} seconds"
+                elif estimated_seconds < 3600:
+                    estimated_time = f"{int(estimated_seconds/60)} minutes"
+                else:
+                    estimated_time = f"{estimated_seconds/3600:.1f} hours"
+        
+        logger.info(f"✅ Queue scan completed: {total_messages} total messages in {len(queue_details)} queues")
+        
+        return {
+            'total_messages_in_queues': {
+                'value': total_messages,
+                'description': f'Total messages across {len(queue_details)} detected queues'
+            },
+            'queue_details': {
+                'value': queue_details[:10],  # Top 10 queues by size
+                'description': f'Details of top queues (showing {min(10, len(queue_details))} of {len(queue_details)} total)'
+            },
+            'estimated_processing_time': {
+                'value': estimated_time,
+                'description': 'Estimated time to process all queued messages (conservative estimate)'
+            }
+        }
+        
+    except TimeoutError:
+        logger.warning(f"❌ Queue scan timed out after {timeout_seconds} seconds")
+        return {
+            'total_messages_in_queues': {
+                'value': 'Timeout',
+                'description': f'Queue scan timed out after {timeout_seconds} seconds'
+            },
+            'queue_details': {
+                'value': [],
+                'description': 'Queue scan timed out before completion'
+            },
+            'estimated_processing_time': {
+                'value': "N/A",
+                'description': 'Not available due to timeout'
+            }
+        }
+    except Exception as e:
+        logger.error(f"❌ Error during queue scan: {e}")
+        return {
+            'total_messages_in_queues': {
+                'value': 'Error',
+                'description': f'Queue scan failed: {str(e)}'
+            },
+            'queue_details': {
+                'value': [],
+                'description': 'Queue scan failed due to error'
+            },
+            'estimated_processing_time': {
+                'value': "N/A",
+                'description': 'Not available due to error'
+            }
+        }
+    finally:
+        # Always cancel the alarm
+        try:
+            signal.alarm(0)
+        except:
+            pass
+
 def get_valkey_stats() -> Dict[str, Any]:
     """Get Valkey database statistics."""
     logger.info("📊 Starting get_valkey_stats()")
@@ -371,29 +539,15 @@ def get_valkey_stats() -> Dict[str, Any]:
             }
         }
         
-        # Get queue information and process rates (disabled temporarily to fix hanging)
-        logger.info("Getting process rates (queue scanning disabled)...")
+        # Get queue information and process rates with timeout protection
+        logger.info("Getting queue information with timeout protection...")
         process_rate = stats['performance']['instantaneous_ops_per_sec']['value'] or 0
         
-        # Simplified queue info without scanning to avoid hanging issues
-        queue_info = {
-            'total_messages_in_queues': {
-                'value': 0,
-                'description': 'Queue scanning disabled to prevent hanging - shows 0'
-            },
-            'process_rate_per_second': {
-                'value': process_rate,
-                'description': 'Current rate of commands/messages being processed per second'
-            },
-            'queue_details': {
-                'value': [],
-                'description': 'Queue scanning temporarily disabled for stability'
-            },
-            'estimated_processing_time': {
-                'value': "N/A",
-                'description': 'Not available when queue scanning is disabled'
-            },
-            'note': 'Queue scanning disabled to prevent hanging issues'
+        # Get queue info with timeout protection
+        queue_info = get_queue_info_with_timeout(client)
+        queue_info['process_rate_per_second'] = {
+            'value': process_rate,
+            'description': 'Current rate of commands/messages being processed per second'
         }
             
         stats['queues'] = queue_info
