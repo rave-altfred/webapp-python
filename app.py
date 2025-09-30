@@ -274,7 +274,23 @@ def get_queue_info_with_timeout(client, timeout_seconds=10) -> Dict[str, Any]:
         total_messages = 0
         queue_details = []
         
-        # First, try to get all keys matching queue patterns
+        # First, let's scan for some sample keys to understand the naming patterns
+        try:
+            cursor = 0
+            sample_keys = []
+            scan_count = 0
+            while cursor != 0 or scan_count == 0:
+                cursor, keys = client.scan(cursor=cursor, count=50)
+                sample_keys.extend(keys[:10])  # Take first 10 from each scan
+                scan_count += 1
+                if len(sample_keys) >= 30 or scan_count > 5:  # Limit sample size
+                    break
+            
+            logger.info(f"Sample keys in database: {sample_keys[:20]}")
+        except Exception as e:
+            logger.warning(f"Error sampling keys: {e}")
+        
+        # Now scan for queue patterns
         all_queue_keys = set()
         for pattern in queue_patterns:
             try:
@@ -293,6 +309,8 @@ def get_queue_info_with_timeout(client, timeout_seconds=10) -> Dict[str, Any]:
                 continue
         
         logger.info(f"Found {len(all_queue_keys)} potential queue keys")
+        if len(all_queue_keys) > 0:
+            logger.info(f"Queue keys found: {list(all_queue_keys)[:10]}")
         
         # Check each key to see if it's actually a queue (list) and get its length
         for key in list(all_queue_keys)[:50]:  # Limit to first 50 keys to prevent long scans
