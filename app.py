@@ -331,8 +331,11 @@ def get_queue_info_with_timeout(client, timeout_seconds=10) -> Dict[str, Any]:
         for key in list(all_queue_keys)[:50]:  # Limit to first 50 keys to prevent long scans
             try:
                 key_type = client.type(key)
+                logger.info(f"Checking key '{key}': type={key_type}")
+                
                 if key_type == 'list':
                     length = client.llen(key)
+                    logger.info(f"List key '{key}' has length: {length}")
                     if length > 0:
                         total_messages += length
                         queue_details.append({
@@ -343,6 +346,7 @@ def get_queue_info_with_timeout(client, timeout_seconds=10) -> Dict[str, Any]:
                 elif key_type == 'zset':
                     # Sorted sets are sometimes used for delayed queues
                     length = client.zcard(key)
+                    logger.info(f"Sorted set key '{key}' has length: {length}")
                     if length > 0:
                         total_messages += length
                         queue_details.append({
@@ -353,6 +357,7 @@ def get_queue_info_with_timeout(client, timeout_seconds=10) -> Dict[str, Any]:
                 elif key_type == 'set':
                     # Sets might be used for unique job tracking
                     length = client.scard(key)
+                    logger.info(f"Set key '{key}' has length: {length}")
                     if length > 0:
                         total_messages += length
                         queue_details.append({
@@ -360,6 +365,8 @@ def get_queue_info_with_timeout(client, timeout_seconds=10) -> Dict[str, Any]:
                             'length': length,
                             'type': 'set'
                         })
+                else:
+                    logger.info(f"Key '{key}' has unsupported type '{key_type}' for queue detection")
             except Exception as e:
                 logger.warning(f"Error checking key {key}: {e}")
                 continue
