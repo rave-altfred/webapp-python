@@ -411,6 +411,15 @@
             <h3 style="margin: 0 0 16px 0; font-size: 1rem; font-weight: 600; color: #4a5568; border-bottom: 1px solid #e2e8f0; padding-bottom: 8px;">📚 Metric Explanations</h3>
             <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px; font-size: 11px; color: #718096; line-height: 1.5;">
                 <div>
+                    <strong style="color: #4a5568; display: block; margin-bottom: 8px;">🗄️ Valkey Database Metrics:</strong>
+                    • <strong>Queue Messages:</strong> Total messages in all detected queues (streams, lists, sets). Green (&lt;500), yellow (&lt;1000), red (&gt;1000)<br>
+                    • <strong>Hit Ratio:</strong> % of successful key lookups vs total lookups (higher is better for performance)<br>
+                    • <strong>Memory:</strong> Current RAM usage by the Valkey database<br>
+                    • <strong>Clients:</strong> Number of active client connections<br>
+                    • <strong>Database Size:</strong> Total number of keys stored in the database<br>
+                    • <strong>Process Rate:</strong> Commands processed per second (in detailed view)
+                </div>
+                <div>
                     <strong style="color: #4a5568; display: block; margin-bottom: 8px;">🐘 PostgreSQL Metrics:</strong>
                     • <strong>Database Size:</strong> Total disk space used including all tables, indexes, and data<br>
                     • <strong>Cache Hit Ratio:</strong> % of data found in memory vs read from disk (&gt;95% excellent, 90-95% good, &lt;90% needs attention)<br>
@@ -483,11 +492,15 @@
             // Helper function to extract value from enhanced structure
             const getValue = (obj) => obj?.value !== undefined ? obj.value : obj;
             
-            // Key metrics for the main line
+            // Queue message count with color coding based on volume
+            const queueCount = getValue(data.queues?.total_messages_in_queues) || 0;
+            const queueColor = queueCount > 1000 ? '#e74c3c' : queueCount > 500 ? '#f39c12' : '#28a745';
+            
+            // Key metrics for the main line - Queue Messages moved to front as most important
             metricsContainer.innerHTML = `
                 <div class="metric">
-                    <div class="metric-label">Database Size</div>
-                    <div class="metric-value">${formatNumber(getValue(data.database_size))} keys</div>
+                    <div class="metric-label">Queue Messages</div>
+                    <div class="metric-value" style="color: ${queueColor}; font-weight: 700;">${formatNumber(queueCount)}</div>
                 </div>
                 <div class="metric">
                     <div class="metric-label">Hit Ratio</div>
@@ -502,8 +515,8 @@
                     <div class="metric-value">${formatNumber(getValue(data.clients?.connected_clients))}</div>
                 </div>
                 <div class="metric">
-                    <div class="metric-label">Uptime</div>
-                    <div class="metric-value">${formatUptime(getValue(data.server?.uptime_in_seconds))}</div>
+                    <div class="metric-label">Database Size</div>
+                    <div class="metric-value">${formatNumber(getValue(data.database_size))} keys</div>
                 </div>
             `;
             
@@ -531,8 +544,8 @@
                         <span class="stat-value">${formatNumber(getValue(data.performance?.total_commands_processed))}</span>
                     </div>
                     <div class="stat-item">
-                        <span class="stat-label">Queue Messages</span>
-                        <span class="stat-value">${formatNumber(getValue(data.queues?.total_messages_in_queues))}</span>
+                        <span class="stat-label">Uptime</span>
+                        <span class="stat-value">${formatUptime(getValue(data.server?.uptime_in_seconds))}</span>
                     </div>
                     <div class="stat-item">
                         <span class="stat-label">Server Version</span>
