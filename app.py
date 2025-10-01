@@ -367,14 +367,49 @@ def get_queue_info_with_timeout(client, timeout_seconds=10) -> Dict[str, Any]:
                         })
                 elif key_type == 'stream':
                     # Redis Streams are commonly used for message queues
-                    length = client.xlen(key)
-                    logger.info(f"Stream key '{key}' has length: {length}")
-                    if length > 0:
-                        total_messages += length
+                    # Check for consumer groups and pending messages first
+                    pending_count = 0
+                    total_stream_length = client.xlen(key)
+                    stream_info = {'total_length': total_stream_length, 'pending_count': 0, 'consumer_groups': []}
+                    
+                    try:
+                        # Get consumer groups for this stream
+                        groups_info = client.xinfo_groups(key)
+                        logger.info(f"Stream key '{key}' has {len(groups_info)} consumer groups")
+                        
+                        for group_info in groups_info:
+                            group_name = group_info['name']
+                            stream_info['consumer_groups'].append(group_name)
+                            
+                            # Get pending messages for this group
+                            try:
+                                pending_info = client.xpending_range(key, group_name, min='-', max='+', count=10000)
+                                group_pending = len(pending_info)
+                                pending_count += group_pending
+                                logger.info(f"Consumer group '{group_name}' has {group_pending} pending messages")
+                            except Exception as e:
+                                logger.warning(f"Error getting pending messages for group {group_name}: {e}")
+                                
+                        stream_info['pending_count'] = pending_count
+                        
+                    except Exception as e:
+                        logger.info(f"Stream '{key}' has no consumer groups or error getting groups: {e}")
+                        # If no consumer groups, treat total length as 'pending' (unprocessed)
+                        pending_count = total_stream_length
+                        stream_info['pending_count'] = pending_count
+                    
+                    # Use pending count if available, otherwise fall back to total length
+                    effective_count = pending_count if pending_count > 0 or len(stream_info['consumer_groups']) > 0 else total_stream_length
+                    
+                    logger.info(f"Stream key '{key}': total_length={total_stream_length}, pending={pending_count}, effective_count={effective_count}")
+                    
+                    if effective_count > 0:
+                        total_messages += effective_count
                         queue_details.append({
                             'name': key,
-                            'length': length,
-                            'type': 'stream'
+                            'length': effective_count,
+                            'type': 'stream',
+                            'stream_info': stream_info
                         })
                 else:
                     logger.info(f"Key '{key}' has unsupported type '{key_type}' for queue detection")
@@ -409,7 +444,7 @@ def get_queue_info_with_timeout(client, timeout_seconds=10) -> Dict[str, Any]:
         return {
             'total_messages_in_queues': {
                 'value': total_messages,
-                'description': f'Total messages across {len(queue_details)} detected queues'
+                'description': f'Pending/unprocessed messages across {len(queue_details)} detected queues (streams show pending in consumer groups, others show total length)'
             },
             'queue_details': {
                 'value': queue_details[:10],  # Top 10 queues by size

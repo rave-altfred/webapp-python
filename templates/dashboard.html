@@ -412,7 +412,7 @@
             <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px; font-size: 11px; color: #718096; line-height: 1.5;">
                 <div>
                     <strong style="color: #4a5568; display: block; margin-bottom: 8px;">🗄️ Valkey Database Metrics:</strong>
-                    • <strong>Queue Messages:</strong> Total messages in all detected queues (streams, lists, sets). Green (&lt;500), yellow (&lt;1000), red (&gt;1000)<br>
+                    • <strong>Queue Messages:</strong> Pending/unprocessed messages in detected queues. For Redis Streams: shows pending messages in consumer groups. For lists/sets: shows total length. Green (&lt;500), yellow (&lt;1000), red (&gt;1000)<br>
                     • <strong>Hit Ratio:</strong> % of successful key lookups vs total lookups (higher is better for performance)<br>
                     • <strong>Memory:</strong> Current RAM usage by the Valkey database<br>
                     • <strong>Clients:</strong> Number of active client connections<br>
