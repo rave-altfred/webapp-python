@@ -1077,7 +1077,7 @@ def api_observations():
     # Validate sort parameters
     allowed_sort_columns = [
         'id', 'job_id', 'client_id', 'stream_id', 'observation_type', 'object_class',
-        'confidence', 'ts_start', 'ts_end', 'created_at', 'tracking_id'
+        'confidence', 'ts_start', 'ts_end', 'created_at', 'tracking_id', 'detection_id'
     ]
     if sort_by not in allowed_sort_columns:
         sort_by = 'created_at'
@@ -1152,7 +1152,7 @@ def api_observations():
                 id, job_id, client_id, stream_id, observation_type, object_class,
                 confidence, bbox_x, bbox_y, bbox_w, bbox_h,
                 ts_start, ts_end, last_refresh_at, spatial_bucket, tracking_id,
-                pose_json, image_path, created_at
+                pose_json, image_path, created_at, detection_id
             FROM observations 
             {where_clause}
             ORDER BY {sort_by} {sort_order.upper()}

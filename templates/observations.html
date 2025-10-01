@@ -593,6 +593,10 @@
                     <span>ID</span>
                 </label>
                 <label class="column-toggle">
+                    <input type="checkbox" class="column-checkbox" data-column="detection_id" checked>
+                    <span>Detection ID</span>
+                </label>
+                <label class="column-toggle">
                     <input type="checkbox" class="column-checkbox" data-column="job_id">
                     <span>Job ID</span>
                 </label>
@@ -680,6 +684,7 @@
         const columns = [
             { key: 'image', label: 'Image', sortable: false },
             { key: 'id', label: 'ID', sortable: true },
+            { key: 'detection_id', label: 'Detection ID', sortable: true },
             { key: 'job_id', label: 'Job ID', sortable: true },
             { key: 'client_id', label: 'Client ID', sortable: true },
             { key: 'stream_id', label: 'Stream ID', sortable: true },
