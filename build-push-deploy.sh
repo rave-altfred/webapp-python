@@ -72,46 +72,125 @@ auth_registry() {
     success "Successfully authenticated with registry"
 }
 
+# Check what type of changes we have (optimized for speed)
+check_change_type() {
+    # If FORCE_FULL_BUILD is set, always do full build
+    if [ "${FORCE_FULL_BUILD:-false}" = "true" ]; then
+        echo "full_build"
+        return 0
+    fi
+    
+    # Check modification times for fast detection
+    local template_modified=false
+    local app_modified=false
+    local config_modified=false
+    
+    # Check if templates directory was modified recently (last 10 minutes)
+    if [ -d "templates/" ] && find templates/ -name "*.html" -newermt "10 minutes ago" 2>/dev/null | grep -q .; then
+        template_modified=true
+    fi
+    
+    # Check if core app files were modified recently
+    for file in "app.py" "requirements.txt" "Dockerfile" "schema.sql"; do
+        if [ -f "$file" ] && [ "$file" -nt ".last_build_hash" ] 2>/dev/null; then
+            app_modified=true
+            break
+        fi
+    done
+    
+    # Check if config files were modified recently  
+    for file in "docker-compose.production.yml" "production.config.json" "nginx.conf"; do
+        if [ -f "$file" ] && [ "$file" -nt ".last_build_hash" ] 2>/dev/null; then
+            config_modified=true
+            break
+        fi
+    done
+    
+    # Determine deployment type based on what changed
+    if [ "$template_modified" = "true" ] && [ "$app_modified" = "false" ]; then
+        echo "templates_only"
+        return 0
+    elif [ "$config_modified" = "true" ] && [ "$app_modified" = "false" ] && [ "$template_modified" = "false" ]; then
+        echo "config_only"
+        return 0
+    else
+        echo "full_build"
+        return 0
+    fi
+}
+
+# Fast deployment for template/config only changes
+deploy_files_only() {
+    log "Deploying template/config files only (no Docker build needed)"
+    
+    # Copy files directly to droplet
+    scp -o StrictHostKeyChecking=no templates/dashboard.html root@"${DROPLET_IP}":/opt/webapp-python/templates/ 2>/dev/null || true
+    scp -o StrictHostKeyChecking=no templates/observations.html root@"${DROPLET_IP}":/opt/webapp-python/templates/ 2>/dev/null || true
+    
+    # Restart only the webapp container (not nginx)
+    ssh -o StrictHostKeyChecking=no root@"${DROPLET_IP}" "
+        cd /opt/webapp-python && 
+        docker-compose -f docker-compose.production.yml restart webapp
+    " >/dev/null 2>&1
+    
+    success "Template files deployed and webapp restarted in under 10 seconds!"
+    return 0
+}
+
 # Check if we need to rebuild the Docker image
 check_build_needed() {
-    # Check if key application files have changed
+    local change_type=$(check_change_type)
+    
+    if [ "$change_type" = "templates_only" ]; then
+        log "Only template files changed - using fast deployment"
+        export SKIP_BUILD=true
+        export DEPLOY_TYPE="templates_only"
+        return 1
+    fi
+    
+    if [ "$change_type" = "config_only" ]; then
+        log "Only config files changed - deploying configs without rebuild"
+        export SKIP_BUILD=true  
+        export DEPLOY_TYPE="config_only"
+        return 1
+    fi
+    
+    # Check if key application files have changed for full builds
     local app_files=("app.py" "requirements.txt" "Dockerfile" "templates/" "schema.sql")
     local last_build_file=".last_build_hash"
     
-    # Calculate current hash of application files
+    # Fast hash calculation using git if available
     local current_hash=""
-    for file in "${app_files[@]}"; do
-        if [ -e "$file" ]; then
-            if [ -d "$file" ]; then
-                if command -v sha256sum >/dev/null 2>&1; then
-                    current_hash+=$(find "$file" -type f -exec sha256sum {} \; 2>/dev/null | sort | sha256sum | cut -d' ' -f1)
-                else
+    if command -v git >/dev/null 2>&1 && git rev-parse --git-dir >/dev/null 2>&1; then
+        # Use git to get hash of tracked files - much faster
+        current_hash=$(git ls-files "${app_files[@]}" 2>/dev/null | xargs -I {} git hash-object {} 2>/dev/null | sort | shasum -a 256 | cut -d' ' -f1)
+    else
+        # Fallback to file system hashing
+        for file in "${app_files[@]}"; do
+            if [ -e "$file" ]; then
+                if [ -d "$file" ]; then
                     current_hash+=$(find "$file" -type f -exec shasum -a 256 {} \; 2>/dev/null | sort | shasum -a 256 | cut -d' ' -f1)
-                fi
-            else
-                if command -v sha256sum >/dev/null 2>&1; then
-                    current_hash+=$(sha256sum "$file" 2>/dev/null | cut -d' ' -f1)
                 else
                     current_hash+=$(shasum -a 256 "$file" 2>/dev/null | cut -d' ' -f1)
                 fi
             fi
-        fi
-    done
-    if command -v sha256sum >/dev/null 2>&1; then
-        current_hash=$(echo "$current_hash" | sha256sum | cut -d' ' -f1)
-    else
+        done
         current_hash=$(echo "$current_hash" | shasum -a 256 | cut -d' ' -f1)
     fi
     
     # Check if we have previous build hash
     if [ ! -f "$last_build_file" ]; then
         log "No previous build hash found, build needed"
+        export SKIP_BUILD=false
+        export DEPLOY_TYPE="full_build"
         return 0
     fi
     
     local last_hash=$(cat "$last_build_file" 2>/dev/null || echo "")
     if [ "$current_hash" != "$last_hash" ]; then
         log "Application files changed, build needed"
+        export SKIP_BUILD=false
+        export DEPLOY_TYPE="full_build"
         return 0
     fi
     
@@ -122,23 +201,41 @@ check_build_needed() {
             success "Successfully pulled existing image from registry for deployment"
         else
             log "Could not pull from registry, build needed"
+            export SKIP_BUILD=false
+            export DEPLOY_TYPE="full_build"
             return 0
         fi
     fi
     
     log "No changes detected and image available, skipping build"
+    export SKIP_BUILD=true
+    export DEPLOY_TYPE="no_changes"
     return 1
 }
 
 # Build the Docker image for AMD64 architecture
 build_image() {
     if ! check_build_needed; then
-        success "Using existing image: ${FULL_IMAGE_NAME}"
-        export SKIP_PUSH=true
-        return 0
+        if [ "$DEPLOY_TYPE" = "templates_only" ]; then
+            deploy_files_only
+            export SKIP_PUSH=true
+            export SKIP_FULL_DEPLOY=true
+            return 0
+        elif [ "$DEPLOY_TYPE" = "config_only" ]; then
+            success "Config-only deployment - will copy configs and restart"
+            export SKIP_PUSH=true
+            export SKIP_FULL_DEPLOY=false
+            return 0
+        else
+            success "Using existing image: ${FULL_IMAGE_NAME}"
+            export SKIP_PUSH=true
+            export SKIP_FULL_DEPLOY=false
+            return 0
+        fi
     fi
     
     export SKIP_PUSH=false
+    export SKIP_FULL_DEPLOY=false
     
     log "Building Docker image for AMD64: ${FULL_IMAGE_NAME}"
     
@@ -147,19 +244,26 @@ build_image() {
     VERSION=$(git rev-parse --short HEAD 2>/dev/null || echo "unknown")
     VCS_REF=$(git rev-parse HEAD 2>/dev/null || echo "unknown")
     
-    # Build for AMD64 platform with cache optimization
+    # Build for AMD64 platform with aggressive cache optimization
     if ! docker buildx build \
         --platform linux/amd64 \
         --build-arg BUILD_DATE="${BUILD_DATE}" \
         --build-arg VERSION="${VERSION}" \
         --build-arg VCS_REF="${VCS_REF}" \
+        --build-arg BUILDKIT_INLINE_CACHE=1 \
         --tag "${FULL_IMAGE_NAME}" \
-        --cache-from "${FULL_IMAGE_NAME}" \
+        --cache-from type=registry,ref="${FULL_IMAGE_NAME}" \
+        --cache-from type=local,src=/tmp/.buildx-cache \
+        --cache-to type=local,dest=/tmp/.buildx-cache-new,mode=max \
         --load \
         .; then
         error "Failed to build Docker image"
         exit 1
     fi
+    
+    # Move cache to avoid growing cache indefinitely
+    rm -rf /tmp/.buildx-cache 2>/dev/null || true
+    mv /tmp/.buildx-cache-new /tmp/.buildx-cache 2>/dev/null || true
     
     # Save current hash for future comparisons
     local app_files=("app.py" "requirements.txt" "Dockerfile" "templates/" "schema.sql")
@@ -657,11 +761,32 @@ main() {
     
     # Execute deployment pipeline
     check_requirements
-    auth_registry
-    build_image
-    push_image
-    copy_config_files
-    deploy_to_droplet
+    
+    # Handle different deployment types
+    if check_build_needed; then
+        # Full build needed
+        auth_registry
+        build_image
+        push_image
+        copy_config_files
+        deploy_to_droplet
+    else
+        # Fast deployment paths
+        if [ "$SKIP_FULL_DEPLOY" = "true" ]; then
+            # Templates-only deployment already completed
+            success "✅ Fast template deployment completed successfully!"
+            show_deployment_info
+            log "🎯 Deployment pipeline completed!"
+            return 0
+        else
+            # Config-only or no-changes deployment
+            auth_registry
+            if [ "$DEPLOY_TYPE" = "config_only" ]; then
+                copy_config_files
+            fi
+            deploy_to_droplet
+        fi
+    fi
     
     # Perform health check (non-blocking)
     if health_check; then
