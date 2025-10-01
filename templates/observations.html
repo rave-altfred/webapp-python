@@ -810,7 +810,7 @@
                             td.innerHTML = `<span class="timestamp">${formatTimestamp(obs.ts_start)}</span>`;
                             break;
                         default:
-                            td.textContent = obs[col.key] || 'N/A';
+                            td.textContent = obs[col.key] !== null && obs[col.key] !== undefined ? obs[col.key] : 'N/A';
                     }
                     
                     row.appendChild(td);
