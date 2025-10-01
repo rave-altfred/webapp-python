@@ -143,9 +143,8 @@ check_build_needed() {
     
     if [ "$change_type" = "templates_only" ]; then
         log "Only template files changed - using fast deployment"
-        export SKIP_BUILD=true
-        export DEPLOY_TYPE="templates_only"
-        return 1
+        deploy_files_only
+        return 2  # Special return code for template-only deployment completed
     fi
     
     if [ "$change_type" = "config_only" ]; then
@@ -781,7 +780,17 @@ main() {
     check_requirements
     
     # Handle different deployment types
-    if check_build_needed; then
+    local build_result=0
+    check_build_needed
+    build_result=$?
+    
+    if [ $build_result -eq 2 ]; then
+        # Template-only deployment already completed
+        success "✅ Super-fast template deployment completed!"
+        show_deployment_info
+        log "🎯 Deployment pipeline completed!"
+        return 0
+    elif [ $build_result -eq 0 ]; then
         # Full build needed
         auth_registry
         build_image
@@ -789,21 +798,12 @@ main() {
         copy_config_files
         deploy_to_droplet
     else
-        # Fast deployment paths
-        if [ "$SKIP_FULL_DEPLOY" = "true" ]; then
-            # Templates-only deployment already completed
-            success "✅ Fast template deployment completed successfully!"
-            show_deployment_info
-            log "🎯 Deployment pipeline completed!"
-            return 0
-        else
-            # Config-only or no-changes deployment
-            auth_registry
-            if [ "$DEPLOY_TYPE" = "config_only" ]; then
-                copy_config_files
-            fi
-            deploy_to_droplet
+        # Fast deployment paths (config-only or no-changes)
+        auth_registry
+        if [ "$DEPLOY_TYPE" = "config_only" ]; then
+            copy_config_files
         fi
+        deploy_to_droplet
     fi
     
     # Perform health check (non-blocking)
