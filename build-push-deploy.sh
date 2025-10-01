@@ -750,13 +750,31 @@ main() {
         exit 1
     fi
     
-    # Auto-load environment variables if .env.local exists
+    # Auto-load environment variables from various sources
     if [ -f ".env.local" ]; then
         log "Loading environment variables from .env.local"
         set -a  # automatically export all variables
         source .env.local
         set +a  # stop auto-exporting
         success "Environment variables loaded from .env.local"
+    elif [ -d "secrets" ]; then
+        log "Loading secrets from secrets/ directory"
+        if [ -f "secrets/valkey_password" ]; then
+            export VALKEY_PASSWORD=$(cat secrets/valkey_password)
+        fi
+        if [ -f "secrets/postgres_password" ]; then
+            export POSTGRES_PASSWORD=$(cat secrets/postgres_password)
+        fi
+        if [ -f "secrets/auth_password" ]; then
+            export AUTH_PASSWORD=$(cat secrets/auth_password)
+        fi
+        if [ -f "secrets/spaces_secret_key" ]; then
+            export SPACES_SECRET_KEY=$(cat secrets/spaces_secret_key)
+        fi
+        if [ -f "secrets/security_token" ]; then
+            export SECURITY_TOKEN=$(cat secrets/security_token)
+        fi
+        success "Secrets loaded from secrets/ directory"
     fi
     
     # Execute deployment pipeline
