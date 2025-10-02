@@ -12,7 +12,7 @@ IMAGE_NAME="webapp-python"
 TAG="latest"
 FULL_IMAGE_NAME="${REGISTRY}/${IMAGE_NAME}:${TAG}"
 DROPLET_NAME="management-web-app"
-DROPLET_IP="164.90.240.205"  # Reserved IP address
+DROPLET_IP="134.122.93.16"  # New droplet IP address
 
 # Colors for output
 RED='\033[0;31m'
