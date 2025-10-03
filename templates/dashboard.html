@@ -6,6 +6,22 @@
     <title>Database Statistics Dashboard</title>
     <!-- Fast deployment test 4 -->
     <style>
+        /* Dracula Theme Colors */
+        :root {
+            --dracula-bg: #282a36;
+            --dracula-current-line: #44475a;
+            --dracula-selection: #44475a;
+            --dracula-fg: #f8f8f2;
+            --dracula-comment: #6272a4;
+            --dracula-cyan: #8be9fd;
+            --dracula-green: #50fa7b;
+            --dracula-orange: #ffb86c;
+            --dracula-pink: #ff79c6;
+            --dracula-purple: #bd93f9;
+            --dracula-red: #ff5555;
+            --dracula-yellow: #f1fa8c;
+        }
+
         * {
             margin: 0;
             padding: 0;
@@ -14,11 +30,11 @@
 
         body {
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
-            background: #f5f7fa;
+            background: var(--dracula-bg);
             min-height: 100vh;
             padding: 0;
             margin: 0;
-            color: #2d3748;
+            color: var(--dracula-fg);
             line-height: 1.5;
         }
 
@@ -29,28 +45,28 @@
         }
 
         .header {
-            background: white;
+            background: var(--dracula-current-line);
             padding: 30px;
             margin: -20px -20px 30px -20px;
-            border-bottom: 1px solid #e2e8f0;
+            border-bottom: 1px solid var(--dracula-selection);
         }
 
         .header h1 {
-            color: #2d3748;
+            color: var(--dracula-purple);
             font-size: 2rem;
             margin: 0 0 8px 0;
             font-weight: 600;
         }
 
         .header p {
-            color: #718096;
+            color: var(--dracula-comment);
             font-size: 1rem;
             margin: 0;
         }
 
         .refresh-btn {
-            background: #4299e1;
-            color: white;
+            background: var(--dracula-purple);
+            color: var(--dracula-bg);
             border: none;
             padding: 12px 24px;
             border-radius: 8px;
@@ -64,19 +80,19 @@
         }
 
         .refresh-btn:hover {
-            background: #3182ce;
+            background: var(--dracula-pink);
             transform: translateY(-1px);
         }
 
         .refresh-btn.loading {
-            background: #9ca3af;
+            background: var(--dracula-comment);
             cursor: not-allowed;
             animation: pulse 1.5s infinite;
         }
 
         .refresh-btn.loading:hover {
             transform: none;
-            background: #9ca3af;
+            background: var(--dracula-comment);
         }
 
         @keyframes pulse {
@@ -85,13 +101,14 @@
         }
         
         .service-refresh-btn {
-            background: #10b981;
-            color: white;
+            background: var(--dracula-green);
+            color: var(--dracula-bg);
             border: none;
             padding: 6px 10px;
             border-radius: 4px;
             cursor: pointer;
             font-size: 12px;
+            font-weight: 500;
             transition: all 0.2s ease;
             margin-left: 8px;
             margin-right: 8px;
@@ -103,7 +120,7 @@
         }
         
         .service-refresh-btn:hover {
-            background: #059669;
+            background: var(--dracula-cyan);
             transform: scale(1.05);
         }
         
@@ -123,11 +140,11 @@
         }
 
         .nav-links a {
-            color: #4a5568;
+            color: var(--dracula-cyan);
             text-decoration: none;
             margin: 0 8px 0 0;
             padding: 8px 16px;
-            border: 1px solid #e2e8f0;
+            border: 1px solid var(--dracula-selection);
             border-radius: 6px;
             transition: all 0.2s ease;
             font-size: 14px;
@@ -135,8 +152,8 @@
         }
 
         .nav-links a:hover {
-            background: #f7fafc;
-            border-color: #cbd5e0;
+            background: var(--dracula-selection);
+            border-color: var(--dracula-purple);
         }
 
         .services-container {
@@ -147,16 +164,16 @@
         }
 
         .service-line {
-            background: white;
+            background: var(--dracula-current-line);
             border-radius: 8px;
             padding: 20px;
-            border: 1px solid #e2e8f0;
+            border: 1px solid var(--dracula-selection);
             transition: border-color 0.2s ease, box-shadow 0.2s ease;
         }
 
         .service-line:hover {
-            border-color: #cbd5e0;
-            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+            border-color: var(--dracula-purple);
+            box-shadow: 0 2px 8px rgba(189, 147, 249, 0.3);
         }
 
         .service-header {
@@ -177,24 +194,24 @@
         }
 
         .valkey-icon {
-            background: #fed7d7;
-            color: #c53030;
+            background: rgba(255, 85, 85, 0.2);
+            color: var(--dracula-red);
         }
 
         .postgres-icon {
-            background: #bee3f8;
-            color: #2b6cb0;
+            background: rgba(139, 233, 253, 0.2);
+            color: var(--dracula-cyan);
         }
 
         .rtsp-icon {
-            background: #d6f5d6;
-            color: #2d7d2d;
+            background: rgba(80, 250, 123, 0.2);
+            color: var(--dracula-green);
         }
 
         .service-title {
             font-size: 1.1rem;
             font-weight: 600;
-            color: #2d3748;
+            color: var(--dracula-fg);
         }
 
         .service-metrics {
@@ -214,7 +231,7 @@
         .metric-label {
             font-size: 11px;
             font-weight: 500;
-            color: #718096;
+            color: var(--dracula-comment);
             text-transform: uppercase;
             margin-bottom: 4px;
         }
@@ -222,13 +239,13 @@
         .metric-value {
             font-size: 1rem;
             font-weight: 600;
-            color: #2d3748;
+            color: var(--dracula-fg);
         }
 
         .service-details {
             margin-top: 16px;
             padding-top: 16px;
-            border-top: 1px solid #e2e8f0;
+            border-top: 1px solid var(--dracula-selection);
             display: none;
         }
 
@@ -239,7 +256,7 @@
         .expand-toggle {
             background: none;
             border: none;
-            color: #4299e1;
+            color: var(--dracula-purple);
             font-size: 12px;
             cursor: pointer;
             padding: 4px 8px;
@@ -248,7 +265,8 @@
         }
 
         .expand-toggle:hover {
-            background: #f7fafc;
+            background: var(--dracula-selection);
+            color: var(--dracula-pink);
         }
 
         .status-indicator {
@@ -261,26 +279,26 @@
         }
 
         .status-connected {
-            background: #c6f6d5;
-            color: #22543d;
+            background: rgba(80, 250, 123, 0.2);
+            color: var(--dracula-green);
         }
 
         .status-error {
-            background: #fed7d7;
-            color: #742a2a;
+            background: rgba(255, 85, 85, 0.2);
+            color: var(--dracula-red);
         }
 
         .stat-item {
             padding: 12px;
-            background: white;
+            background: var(--dracula-selection);
             border-radius: 6px;
-            border: 1px solid #e2e8f0;
+            border: 1px solid var(--dracula-current-line);
             text-align: center;
         }
 
         .stat-label {
             font-weight: 500;
-            color: #4a5568;
+            color: var(--dracula-comment);
             display: block;
             margin-bottom: 6px;
             font-size: 12px;
@@ -288,7 +306,7 @@
 
         .stat-value {
             font-size: 1.4rem;
-            color: #2d3748;
+            color: var(--dracula-fg);
             font-weight: 600;
         }
 
@@ -301,16 +319,16 @@
 
         .loading {
             text-align: center;
-            color: #666;
+            color: var(--dracula-comment);
             font-style: italic;
         }
 
         .error-message {
-            background: #f8d7da;
-            color: #721c24;
+            background: rgba(255, 85, 85, 0.1);
+            color: var(--dracula-red);
             padding: 15px;
             border-radius: 8px;
-            border-left: 4px solid #dc3545;
+            border-left: 4px solid var(--dracula-red);
             margin-bottom: 15px;
         }
 
@@ -328,34 +346,34 @@
         .table-stats th, .table-stats td {
             padding: 8px 12px;
             text-align: left;
-            border-bottom: 1px solid #dee2e6;
+            border-bottom: 1px solid var(--dracula-selection);
         }
 
         .table-stats th {
-            background: #f8f9fa;
+            background: var(--dracula-current-line);
             font-weight: 600;
-            color: #495057;
+            color: var(--dracula-purple);
         }
 
         .highlight-metric {
-            background: #f0f9ff;
-            border: 1px solid #7dd3fc;
+            background: rgba(189, 147, 249, 0.1);
+            border: 1px solid var(--dracula-purple);
         }
 
         .highlight-metric .stat-value {
-            color: #0369a1;
+            color: var(--dracula-purple);
         }
 
         .last-updated {
             text-align: center;
-            color: #718096;
+            color: var(--dracula-comment);
             font-size: 13px;
             margin-top: 20px;
         }
         
         .status-updating {
-            background: #fef3cd !important;
-            color: #997404 !important;
+            background: rgba(241, 250, 140, 0.2) !important;
+            color: var(--dracula-yellow) !important;
             animation: pulse 1.5s infinite;
         }
 
