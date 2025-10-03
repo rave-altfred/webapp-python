@@ -1,29 +1,15 @@
 # Multi-stage build for Flask webapp
-FROM python:3.11-slim as builder
+FROM python:3.11-slim as deps
 
-# Set build arguments
-ARG BUILD_DATE
-ARG VERSION
-ARG VCS_REF
-
-# Add metadata labels
-LABEL org.label-schema.build-date=$BUILD_DATE \
-      org.label-schema.name="Database Statistics Dashboard" \
-      org.label-schema.description="Flask webapp for monitoring Valkey and PostgreSQL databases" \
-      org.label-schema.version=$VERSION \
-      org.label-schema.vcs-ref=$VCS_REF \
-      org.label-schema.vcs-url="https://github.com/altfred/webapp-python" \
-      org.label-schema.schema-version="1.0"
-
-# Set working directory
-WORKDIR /app
-
-# Install system dependencies
+# Install system dependencies in a separate layer for better caching
 RUN apt-get update && apt-get install -y --no-install-recommends \
     gcc \
     libpq-dev \
     curl \
     && rm -rf /var/lib/apt/lists/*
+
+# Set working directory
+WORKDIR /app
 
 # Copy requirements first to leverage Docker layer caching
 COPY requirements.txt .
@@ -50,8 +36,8 @@ RUN groupadd -r webapp && useradd -r -g webapp webapp
 # Set working directory
 WORKDIR /app
 
-# Copy virtual environment from builder stage
-COPY --from=builder /opt/venv /opt/venv
+# Copy virtual environment from deps stage
+COPY --from=deps /opt/venv /opt/venv
 ENV PATH="/opt/venv/bin:$PATH"
 
 # Copy application files
@@ -66,6 +52,19 @@ RUN mkdir -p logs && \
 
 # Switch to non-root user
 USER webapp
+
+# Add metadata labels at the end to avoid cache invalidation
+ARG BUILD_DATE
+ARG VERSION
+ARG VCS_REF
+
+LABEL org.label-schema.build-date=$BUILD_DATE \
+      org.label-schema.name="Database Statistics Dashboard" \
+      org.label-schema.description="Flask webapp for monitoring Valkey and PostgreSQL databases" \
+      org.label-schema.version=$VERSION \
+      org.label-schema.vcs-ref=$VCS_REF \
+      org.label-schema.vcs-url="https://github.com/altfred/webapp-python" \
+      org.label-schema.schema-version="1.0"
 
 # Set environment variables
 ENV FLASK_APP=app.py

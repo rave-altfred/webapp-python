@@ -1,0 +1,76 @@
+# Git files
+.git
+.gitignore
+
+# Docker files
+.dockerignore
+Dockerfile*
+
+# Python cache and temporary files
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# Virtual environments
+venv/
+env/
+ENV/
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Logs
+logs/
+*.log
+
+# Deployment scripts (not needed in container)
+deploy.sh
+build-push-deploy.sh
+
+# Documentation
+README.md
+*.md
+
+# Secrets (should use Docker secrets instead)
+secrets/
+*.pem
+*.key
+
+# Build artifacts
+.last_build_hash
+
+# Temporary files
+tmp/
+temp/
+*.tmp
