@@ -521,18 +521,18 @@ def get_queue_info_with_timeout(client, timeout_seconds=10) -> Dict[str, Any]:
             else:
                 pel_backlog_time = f"{pel_processing_seconds/3600:.1f} hours"
         
-        logger.info(f"✅ Queue scan completed: {total_messages} total messages ({total_pel_messages} in PEL, {total_undelivered_messages} undelivered) across {len(queue_details)} queues")
-        if pel_problem_detected:
-            logger.warning(f"🚨 PEL PROBLEM: {total_pel_messages} messages stuck in PEL, oldest {oldest_pel_age:.1f}s old")
-        elif total_undelivered_messages > 0:
-            logger.info(f"📬 {total_undelivered_messages} undelivered messages waiting in streams (not yet read by consumers)")
-        
         # Calculate undelivered messages separately for better reporting
         total_undelivered_messages = 0
         for queue in queue_details:
             if queue.get('type') == 'stream' and 'stream_info' in queue:
                 stream_info = queue['stream_info']
                 total_undelivered_messages += stream_info.get('available_unread', 0)
+        
+        logger.info(f"✅ Queue scan completed: {total_messages} total messages ({total_pel_messages} in PEL, {total_undelivered_messages} undelivered) across {len(queue_details)} queues")
+        if pel_problem_detected:
+            logger.warning(f"🚨 PEL PROBLEM: {total_pel_messages} messages stuck in PEL, oldest {oldest_pel_age:.1f}s old")
+        elif total_undelivered_messages > 0:
+            logger.info(f"📬 {total_undelivered_messages} undelivered messages waiting in streams (not yet read by consumers)")
         
         return {
             'total_messages_in_queues': {
