@@ -199,4 +199,7 @@ logs/
 node_modules/
 npm-debug.log*
 yarn-debug.log*
-yarn-error.log*.last_build_hash
+yarn-error.log*
+
+# Build artifacts
+.last_build_hash
