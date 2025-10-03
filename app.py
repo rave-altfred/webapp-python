@@ -382,7 +382,8 @@ def get_queue_info_with_timeout(client, timeout_seconds=10) -> Dict[str, Any]:
                     try:
                         # Get consumer groups for this stream
                         groups_info = client.xinfo_groups(key)
-                        logger.info(f"Stream key '{key}' has {len(groups_info)} consumer groups")
+                        logger.info(f"🔍 DEBUG: Stream key '{key}' has {len(groups_info)} consumer groups")
+                        logger.info(f"🔍 DEBUG: Groups info: {groups_info}")
                         
                         for group_info in groups_info:
                             group_name = group_info['name']
@@ -395,13 +396,18 @@ def get_queue_info_with_timeout(client, timeout_seconds=10) -> Dict[str, Any]:
                             # Get detailed PEL information - this is the key!
                             try:
                                 # Get pending messages summary first
+                                logger.info(f"🔍 DEBUG: Calling XPENDING for stream '{key}', group '{group_name}'")
                                 pending_summary = client.xpending(key, group_name)
+                                logger.info(f"🔍 DEBUG: XPENDING result: {pending_summary}")
+                                
                                 if pending_summary and len(pending_summary) >= 4:
                                     total_pending = pending_summary[0]
                                     pending_count += total_pending
+                                    logger.info(f"🔍 DEBUG: Found {total_pending} pending messages in summary")
                                     
                                     # Get individual pending messages (limited sample for performance)
                                     pending_info = client.xpending_range(key, group_name, min='-', max='+', count=100)
+                                    logger.info(f"🔍 DEBUG: XPENDING_RANGE returned {len(pending_info)} messages")
                                     
                                     pel_detail = {
                                         'group_name': group_name,
@@ -415,12 +421,14 @@ def get_queue_info_with_timeout(client, timeout_seconds=10) -> Dict[str, Any]:
                                         oldest_msg = pending_info[0]
                                         age_ms = oldest_msg[1]  # Age in milliseconds
                                         pel_detail['oldest_message_age_seconds'] = age_ms / 1000
+                                        logger.info(f"🔍 DEBUG: Oldest pending message age: {age_ms}ms")
                                         
                                     stream_info['pel_details'].append(pel_detail)
                                     
                                     logger.info(f"🚨 PEL ISSUE DETECTED: Group '{group_name}' has {total_pending} messages in PEL, oldest {age_ms/1000:.1f}s old")
                                 else:
-                                    logger.info(f"Consumer group '{group_name}' has empty PEL")
+                                    logger.info(f"🔍 DEBUG: Consumer group '{group_name}' has empty PEL or invalid XPENDING response")
+                                    logger.info(f"🔍 DEBUG: pending_summary type: {type(pending_summary)}, length: {len(pending_summary) if pending_summary else 'None'}")
                                     
                             except Exception as e:
                                 logger.warning(f"Error getting PEL details for group {group_name}: {e}")
