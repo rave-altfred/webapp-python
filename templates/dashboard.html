@@ -83,6 +83,40 @@
             0%, 100% { opacity: 1; }
             50% { opacity: 0.7; }
         }
+        
+        .service-refresh-btn {
+            background: #10b981;
+            color: white;
+            border: none;
+            padding: 6px 10px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 12px;
+            transition: all 0.2s ease;
+            margin-left: 8px;
+            margin-right: 8px;
+            min-width: 32px;
+            height: 28px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .service-refresh-btn:hover {
+            background: #059669;
+            transform: scale(1.05);
+        }
+        
+        .service-refresh-btn.loading {
+            opacity: 0.7;
+            cursor: not-allowed;
+            animation: spin 1s linear infinite;
+        }
+        
+        @keyframes spin {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+        }
 
         .nav-links {
             margin: 16px 0 0 0;
@@ -354,7 +388,7 @@
                 <a href="/">📊 Dashboard</a>
                 <a href="/observations">🔍 Observations</a>
             </div>
-            <button id="refresh-btn" class="refresh-btn" onclick="refreshData()">🔄 Refresh Data</button>
+            <button id="refresh-btn" class="refresh-btn" onclick="refreshData()">🔄 Refresh All</button>
         </div>
 
         <div class="services-container">
@@ -364,6 +398,7 @@
                     <div class="service-icon valkey-icon">🗄️</div>
                     <h2 class="service-title">Valkey Database</h2>
                     <span id="valkey-status" class="status-indicator">...</span>
+                    <button id="valkey-refresh-btn" class="service-refresh-btn" onclick="refreshService('valkey')" title="Refresh Valkey data">🔄</button>
                     <button class="expand-toggle" onclick="toggleDetails('valkey-service')">▼ Details</button>
                 </div>
                 <div id="valkey-metrics" class="service-metrics">
@@ -380,6 +415,7 @@
                     <div class="service-icon postgres-icon">🐘</div>
                     <h2 class="service-title">PostgreSQL Database</h2>
                     <span id="postgres-status" class="status-indicator">...</span>
+                    <button id="postgres-refresh-btn" class="service-refresh-btn" onclick="refreshService('postgres')" title="Refresh PostgreSQL data">🔄</button>
                     <button class="expand-toggle" onclick="toggleDetails('postgres-service')">▼ Details</button>
                 </div>
                 <div id="postgres-metrics" class="service-metrics">
@@ -396,6 +432,7 @@
                     <div class="service-icon rtsp-icon">📹</div>
                     <h2 class="service-title">RTSP Reader Service</h2>
                     <span id="rtsp-reader-status" class="status-indicator">...</span>
+                    <button id="rtsp-reader-refresh-btn" class="service-refresh-btn" onclick="refreshService('rtsp-reader')" title="Refresh RTSP Reader data">🔄</button>
                     <button class="expand-toggle" onclick="toggleDetails('rtsp-reader-service')">▼ Details</button>
                 </div>
                 <div id="rtsp-reader-metrics" class="service-metrics">
@@ -861,11 +898,58 @@
                 .finally(() => {
                     // Reset loading state
                     isRefreshing = false;
-                    refreshBtn.textContent = '🔄 Refresh Data';
+                    refreshBtn.textContent = '🔄 Refresh All';
                     refreshBtn.classList.remove('loading');
                     valkeyStatus.classList.remove('status-updating');
                     postgresStatus.classList.remove('status-updating');
                     rtspReaderStatus.classList.remove('status-updating');
+                });
+        }
+        
+        // Individual service refresh function
+        function refreshService(service) {
+            const serviceRefreshBtn = document.getElementById(`${service}-refresh-btn`);
+            const serviceStatus = document.getElementById(`${service}-status`);
+            
+            if (serviceRefreshBtn.classList.contains('loading')) return; // Prevent multiple requests
+            
+            // Show loading state
+            serviceRefreshBtn.classList.add('loading');
+            serviceStatus.classList.add('status-updating');
+            
+            const apiEndpoint = service === 'rtsp-reader' ? '/api/rtsp_reader' : `/api/${service}`;
+            
+            fetch(apiEndpoint)
+                .then(response => response.json())
+                .then(data => {
+                    // Add timestamp to data for consistency
+                    data.timestamp = new Date().toISOString();
+                    
+                    // Render the specific service data
+                    switch(service) {
+                        case 'valkey':
+                            renderValkeyStats(data);
+                            break;
+                        case 'postgres':
+                            renderPostgresStats(data);
+                            break;
+                        case 'rtsp-reader':
+                            renderRtspReaderStats(data);
+                            break;
+                    }
+                    
+                    // Update last updated timestamp
+                    document.getElementById('last-updated').textContent = 
+                        `Last updated: ${new Date(data.timestamp).toLocaleString()} (${service.replace('-', ' ')})`;
+                })
+                .catch(error => {
+                    console.error(`Error fetching ${service} stats:`, error);
+                    showErrorOverlay(`${service}-metrics`, `Error loading ${service.replace('-', ' ')} statistics`);
+                })
+                .finally(() => {
+                    // Reset loading state
+                    serviceRefreshBtn.classList.remove('loading');
+                    serviceStatus.classList.remove('status-updating');
                 });
         }
         
