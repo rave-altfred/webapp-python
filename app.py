@@ -2,7 +2,7 @@
 Database Statistics Dashboard
 A Flask web application to display Valkey and PostgreSQL database statistics.
 Updated with individual service refresh buttons.
-Test deployment speed - small change.
+Test deployment speed - testing cache optimization.
 """
 
 import json
