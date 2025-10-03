@@ -9,6 +9,9 @@ import os
 import logging
 from datetime import datetime, timedelta
 from typing import Dict, Any, Optional
+from collections import deque
+import threading
+import time
 
 import redis
 import psycopg2
@@ -28,6 +31,67 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 app = Flask(__name__)
+
+# PEL Peek functionality - tracks PEL messages over time
+class PELTracker:
+    """Tracks PEL (Pending Entry List) messages over the last 10 minutes."""
+    
+    def __init__(self, window_minutes=10):
+        self.window_minutes = window_minutes
+        self.samples = deque()  # (timestamp, stream_name, group_name, pel_count, oldest_age_ms)
+        self.lock = threading.Lock()
+    
+    def record_pel_sample(self, stream_name: str, group_name: str, pel_count: int, oldest_age_ms: int = 0):
+        """Record a PEL sample with timestamp."""
+        timestamp = time.time()
+        with self.lock:
+            self.samples.append((timestamp, stream_name, group_name, pel_count, oldest_age_ms))
+            self._cleanup_old_samples()
+    
+    def _cleanup_old_samples(self):
+        """Remove samples older than the time window."""
+        cutoff_time = time.time() - (self.window_minutes * 60)
+        while self.samples and self.samples[0][0] < cutoff_time:
+            self.samples.popleft()
+    
+    def get_pel_peek_stats(self) -> Dict[str, Any]:
+        """Get PEL statistics for the last 10 minutes."""
+        with self.lock:
+            self._cleanup_old_samples()
+            
+            if not self.samples:
+                return {
+                    'total_samples': 0,
+                    'max_pel_count': 0,
+                    'avg_pel_count': 0,
+                    'current_pel_count': 0,
+                    'peak_time': None,
+                    'samples_with_pel': 0,
+                    'window_minutes': self.window_minutes
+                }
+            
+            # Extract pel counts
+            pel_counts = [sample[3] for sample in self.samples]
+            non_zero_pels = [count for count in pel_counts if count > 0]
+            
+            # Find peak
+            max_pel = max(pel_counts) if pel_counts else 0
+            max_pel_sample = max(self.samples, key=lambda x: x[3]) if self.samples else None
+            
+            return {
+                'total_samples': len(self.samples),
+                'max_pel_count': max_pel,
+                'avg_pel_count': round(sum(pel_counts) / len(pel_counts), 1) if pel_counts else 0,
+                'current_pel_count': self.samples[-1][3] if self.samples else 0,
+                'peak_time': datetime.fromtimestamp(max_pel_sample[0]).strftime('%H:%M:%S') if max_pel_sample and max_pel > 0 else None,
+                'samples_with_pel': len(non_zero_pels),
+                'pel_frequency_percent': round((len(non_zero_pels) / len(self.samples)) * 100, 1) if self.samples else 0,
+                'window_minutes': self.window_minutes,
+                'oldest_sample_age_minutes': round((time.time() - self.samples[0][0]) / 60, 1) if self.samples else 0
+            }
+
+# Global PEL tracker instance
+pel_tracker = PELTracker()
 
 def read_secret_file(file_path: str) -> Optional[str]:
     """Read a secret from a Docker secrets file."""
@@ -400,8 +464,9 @@ def get_queue_info_with_timeout(client, timeout_seconds=10) -> Dict[str, Any]:
                                 pending_summary = client.xpending(key, group_name)
                                 logger.info(f"🔍 DEBUG: XPENDING result: {pending_summary}")
                                 
-                                if pending_summary and len(pending_summary) >= 4:
-                                    total_pending = pending_summary[0]
+                                # XPENDING returns a dict with 'pending' key
+                                if pending_summary and isinstance(pending_summary, dict) and 'pending' in pending_summary:
+                                    total_pending = pending_summary['pending']
                                     pending_count += total_pending
                                     logger.info(f"🔍 DEBUG: Found {total_pending} pending messages in summary")
                                     
@@ -409,26 +474,35 @@ def get_queue_info_with_timeout(client, timeout_seconds=10) -> Dict[str, Any]:
                                     pending_info = client.xpending_range(key, group_name, min='-', max='+', count=100)
                                     logger.info(f"🔍 DEBUG: XPENDING_RANGE returned {len(pending_info)} messages")
                                     
+                                    # Calculate oldest message age
+                                    oldest_age_ms = 0
+                                    if pending_info:
+                                        oldest_msg = pending_info[0]
+                                        oldest_age_ms = oldest_msg[1]  # Age in milliseconds
+                                        logger.info(f"🔍 DEBUG: Oldest pending message age: {oldest_age_ms}ms")
+                                    
                                     pel_detail = {
                                         'group_name': group_name,
                                         'total_pending': total_pending,
-                                        'oldest_age_ms': pending_summary[2] if len(pending_summary) > 2 else 0,
-                                        'sample_messages': len(pending_info)
+                                        'oldest_age_ms': oldest_age_ms,
+                                        'oldest_message_age_seconds': oldest_age_ms / 1000,
+                                        'sample_messages': len(pending_info),
+                                        'min_id': pending_summary.get('min'),
+                                        'max_id': pending_summary.get('max'),
+                                        'consumers': pending_summary.get('consumers', [])
                                     }
                                     
-                                    # Calculate processing delay indicators
-                                    if pending_info:
-                                        oldest_msg = pending_info[0]
-                                        age_ms = oldest_msg[1]  # Age in milliseconds
-                                        pel_detail['oldest_message_age_seconds'] = age_ms / 1000
-                                        logger.info(f"🔍 DEBUG: Oldest pending message age: {age_ms}ms")
-                                        
                                     stream_info['pel_details'].append(pel_detail)
                                     
-                                    logger.info(f"🚨 PEL ISSUE DETECTED: Group '{group_name}' has {total_pending} messages in PEL, oldest {age_ms/1000:.1f}s old")
+                                    # Record PEL sample for tracking
+                                    pel_tracker.record_pel_sample(key, group_name, total_pending, oldest_age_ms)
+                                    
+                                    logger.info(f"🚨 PEL ISSUE DETECTED: Group '{group_name}' has {total_pending} messages in PEL, oldest {oldest_age_ms/1000:.1f}s old")
                                 else:
+                                    # Record zero PEL sample for tracking
+                                    pel_tracker.record_pel_sample(key, group_name, 0, 0)
                                     logger.info(f"🔍 DEBUG: Consumer group '{group_name}' has empty PEL or invalid XPENDING response")
-                                    logger.info(f"🔍 DEBUG: pending_summary type: {type(pending_summary)}, length: {len(pending_summary) if pending_summary else 'None'}")
+                                    logger.info(f"🔍 DEBUG: pending_summary type: {type(pending_summary)}, content: {pending_summary}")
                                     
                             except Exception as e:
                                 logger.warning(f"Error getting PEL details for group {group_name}: {e}")
@@ -537,11 +611,18 @@ def get_queue_info_with_timeout(client, timeout_seconds=10) -> Dict[str, Any]:
                 stream_info = queue['stream_info']
                 total_undelivered_messages += stream_info.get('available_unread', 0)
         
+        # Get PEL Peek statistics
+        pel_peek_stats = pel_tracker.get_pel_peek_stats()
+        
         logger.info(f"✅ Queue scan completed: {total_messages} total messages ({total_pel_messages} in PEL, {total_undelivered_messages} undelivered) across {len(queue_details)} queues")
         if pel_problem_detected:
             logger.warning(f"🚨 PEL PROBLEM: {total_pel_messages} messages stuck in PEL, oldest {oldest_pel_age:.1f}s old")
         elif total_undelivered_messages > 0:
             logger.info(f"📬 {total_undelivered_messages} undelivered messages waiting in streams (not yet read by consumers)")
+        
+        # Log PEL Peek stats
+        if pel_peek_stats['max_pel_count'] > 0:
+            logger.info(f"🕰️ PEL PEEK: Max {pel_peek_stats['max_pel_count']} messages at {pel_peek_stats['peak_time']}, {pel_peek_stats['pel_frequency_percent']}% of samples had PEL messages")
         
         return {
             'total_messages_in_queues': {
@@ -567,6 +648,10 @@ def get_queue_info_with_timeout(client, timeout_seconds=10) -> Dict[str, Any]:
             'stream_summary': {
                 'value': f"{total_streams} streams, {total_consumer_groups} consumer groups",
                 'description': f'Redis streams infrastructure: {total_streams} streams with {total_consumer_groups} consumer groups'
+            },
+            'pel_peek': {
+                'value': pel_peek_stats,
+                'description': f'PEL tracking over last {pel_peek_stats["window_minutes"]} minutes - captures fast-processing PEL spikes'
             },
             'queue_details': {
                 'value': queue_details[:10],  # Top 10 queues by size
