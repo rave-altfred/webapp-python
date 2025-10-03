@@ -573,13 +573,13 @@ def get_queue_info_with_timeout(client, timeout_seconds=10) -> Dict[str, Any]:
                 for pel_detail in stream_info.get('pel_details', []):
                     # Check for PEL problem (messages older than 30 seconds indicate processing delays)
                     age_seconds = pel_detail.get('oldest_message_age_seconds', 0)
-                    if stream_pel_count > 0 and age_seconds > 30:
+                    if stream_pel_count > 10 and age_seconds > 30:
                         pel_problem_detected = True
                     oldest_pel_age = max(oldest_pel_age, age_seconds)
                 
                 # If no pel_details but we have pending messages, still check for problems
-                if not stream_info.get('pel_details') and stream_pel_count > 0:
-                    # Assume it's a problem if we have PEL messages (since they should be processed quickly)
+                if not stream_info.get('pel_details') and stream_pel_count > 10:
+                    # Only consider it a problem if we have more than 10 PEL messages
                     pel_problem_detected = True
         
         # Calculate estimated processing time with PEL consideration
