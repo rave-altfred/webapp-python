@@ -574,7 +574,7 @@
             
             // Detailed metrics for expanded view - Focus on PEL analysis!
             let pelDetailsHtml = '';
-            if (pelProblem === 'DETECTED' || pelMessages > 0) {
+            if (pelProblem === 'DETECTED' || pelMessages > 10) {
                 pelDetailsHtml = `
                     <div style="background: #fff5f5; border: 2px solid #e74c3c; border-radius: 8px; padding: 16px; margin-bottom: 16px;">
                         <h4 style="color: #e74c3c; margin: 0 0 12px 0; font-size: 14px;">🚨 PEL (Pending Entry List) Analysis</h4>
