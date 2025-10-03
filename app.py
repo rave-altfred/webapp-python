@@ -436,9 +436,15 @@ def get_queue_info_with_timeout(client, timeout_seconds=10) -> Dict[str, Any]:
                         stream_info['pending_count'] = pending_count
                         stream_info['available_unread'] = total_stream_length
                     
-                    # For streams with consumer groups, PEL messages are the real issue
-                    # They're "delivered" but not processed/ACKed yet
-                    effective_count = pending_count if len(stream_info['consumer_groups']) > 0 else total_stream_length
+                    # For streams with consumer groups, count BOTH PEL and undelivered messages
+                    # PEL = delivered but not ACKed (the main issue you mentioned)
+                    # Undelivered = in stream but not yet delivered to consumers (lag)
+                    if len(stream_info['consumer_groups']) > 0:
+                        # Count both PEL messages AND undelivered messages (lag)
+                        effective_count = pending_count + stream_info['available_unread']
+                    else:
+                        # No consumer groups, so all messages are unprocessed
+                        effective_count = total_stream_length
                     
                     logger.info(f"Stream '{key}': total={total_stream_length}, PEL_pending={pending_count}, unread={stream_info['available_unread']}, effective={effective_count}")
                     
@@ -515,14 +521,23 @@ def get_queue_info_with_timeout(client, timeout_seconds=10) -> Dict[str, Any]:
             else:
                 pel_backlog_time = f"{pel_processing_seconds/3600:.1f} hours"
         
-        logger.info(f"✅ Queue scan completed: {total_messages} total messages ({total_pel_messages} in PEL) across {len(queue_details)} queues")
+        logger.info(f"✅ Queue scan completed: {total_messages} total messages ({total_pel_messages} in PEL, {total_undelivered_messages} undelivered) across {len(queue_details)} queues")
         if pel_problem_detected:
             logger.warning(f"🚨 PEL PROBLEM: {total_pel_messages} messages stuck in PEL, oldest {oldest_pel_age:.1f}s old")
+        elif total_undelivered_messages > 0:
+            logger.info(f"📬 {total_undelivered_messages} undelivered messages waiting in streams (not yet read by consumers)")
+        
+        # Calculate undelivered messages separately for better reporting
+        total_undelivered_messages = 0
+        for queue in queue_details:
+            if queue.get('type') == 'stream' and 'stream_info' in queue:
+                stream_info = queue['stream_info']
+                total_undelivered_messages += stream_info.get('available_unread', 0)
         
         return {
             'total_messages_in_queues': {
                 'value': total_messages,
-                'description': f'Total pending messages: {total_pel_messages} in PEL (delivered but unprocessed), {total_messages - total_pel_messages} undelivered'
+                'description': f'Total queue messages: {total_pel_messages} in PEL (delivered but unprocessed) + {total_undelivered_messages} undelivered = {total_messages} total'
             },
             'pel_messages': {
                 'value': total_pel_messages,
