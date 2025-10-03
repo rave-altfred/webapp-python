@@ -565,15 +565,22 @@ def get_queue_info_with_timeout(client, timeout_seconds=10) -> Dict[str, Any]:
                 stream_info = queue['stream_info']
                 total_consumer_groups += len(stream_info.get('consumer_groups', []))
                 
+                # Use the actual pending_count from stream_info (this is the real PEL count!)
+                stream_pel_count = stream_info.get('pending_count', 0)
+                total_pel_messages += stream_pel_count
+                
+                # Also check pel_details if available for age information
                 for pel_detail in stream_info.get('pel_details', []):
-                    pel_count = pel_detail.get('total_pending', 0)
-                    total_pel_messages += pel_count
-                    
                     # Check for PEL problem (messages older than 30 seconds indicate processing delays)
                     age_seconds = pel_detail.get('oldest_message_age_seconds', 0)
-                    if pel_count > 0 and age_seconds > 30:
+                    if stream_pel_count > 0 and age_seconds > 30:
                         pel_problem_detected = True
                     oldest_pel_age = max(oldest_pel_age, age_seconds)
+                
+                # If no pel_details but we have pending messages, still check for problems
+                if not stream_info.get('pel_details') and stream_pel_count > 0:
+                    # Assume it's a problem if we have PEL messages (since they should be processed quickly)
+                    pel_problem_detected = True
         
         # Calculate estimated processing time with PEL consideration
         estimated_time = "N/A"
@@ -617,6 +624,8 @@ def get_queue_info_with_timeout(client, timeout_seconds=10) -> Dict[str, Any]:
         logger.info(f"✅ Queue scan completed: {total_messages} total messages ({total_pel_messages} in PEL, {total_undelivered_messages} undelivered) across {len(queue_details)} queues")
         if pel_problem_detected:
             logger.warning(f"🚨 PEL PROBLEM: {total_pel_messages} messages stuck in PEL, oldest {oldest_pel_age:.1f}s old")
+        elif total_pel_messages > 0:
+            logger.info(f"📬 {total_pel_messages} PEL messages being processed (likely fast processing)")
         elif total_undelivered_messages > 0:
             logger.info(f"📬 {total_undelivered_messages} undelivered messages waiting in streams (not yet read by consumers)")
         
