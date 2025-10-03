@@ -367,10 +367,16 @@ def get_queue_info_with_timeout(client, timeout_seconds=10) -> Dict[str, Any]:
                         })
                 elif key_type == 'stream':
                     # Redis Streams are commonly used for message queues
-                    # Check for consumer groups and pending messages first
+                    # Focus on PEL (Pending Entry List) - the key issue!
                     pending_count = 0
                     total_stream_length = client.xlen(key)
-                    stream_info = {'total_length': total_stream_length, 'pending_count': 0, 'consumer_groups': []}
+                    stream_info = {
+                        'total_length': total_stream_length, 
+                        'pending_count': 0, 
+                        'consumer_groups': [],
+                        'pel_details': [],  # Add detailed PEL info
+                        'available_unread': 0  # Messages in stream not yet read
+                    }
                     
                     try:
                         # Get consumer groups for this stream
@@ -379,16 +385,47 @@ def get_queue_info_with_timeout(client, timeout_seconds=10) -> Dict[str, Any]:
                         
                         for group_info in groups_info:
                             group_name = group_info['name']
-                            stream_info['consumer_groups'].append(group_name)
+                            lag = group_info.get('lag', 0)  # Messages not yet delivered to consumers
+                            stream_info['consumer_groups'].append({
+                                'name': group_name,
+                                'lag': lag
+                            })
                             
-                            # Get pending messages for this group
+                            # Get detailed PEL information - this is the key!
                             try:
-                                pending_info = client.xpending_range(key, group_name, min='-', max='+', count=10000)
-                                group_pending = len(pending_info)
-                                pending_count += group_pending
-                                logger.info(f"Consumer group '{group_name}' has {group_pending} pending messages")
+                                # Get pending messages summary first
+                                pending_summary = client.xpending(key, group_name)
+                                if pending_summary and len(pending_summary) >= 4:
+                                    total_pending = pending_summary[0]
+                                    pending_count += total_pending
+                                    
+                                    # Get individual pending messages (limited sample for performance)
+                                    pending_info = client.xpending_range(key, group_name, min='-', max='+', count=100)
+                                    
+                                    pel_detail = {
+                                        'group_name': group_name,
+                                        'total_pending': total_pending,
+                                        'oldest_age_ms': pending_summary[2] if len(pending_summary) > 2 else 0,
+                                        'sample_messages': len(pending_info)
+                                    }
+                                    
+                                    # Calculate processing delay indicators
+                                    if pending_info:
+                                        oldest_msg = pending_info[0]
+                                        age_ms = oldest_msg[1]  # Age in milliseconds
+                                        pel_detail['oldest_message_age_seconds'] = age_ms / 1000
+                                        
+                                    stream_info['pel_details'].append(pel_detail)
+                                    
+                                    logger.info(f"🚨 PEL ISSUE DETECTED: Group '{group_name}' has {total_pending} messages in PEL, oldest {age_ms/1000:.1f}s old")
+                                else:
+                                    logger.info(f"Consumer group '{group_name}' has empty PEL")
+                                    
                             except Exception as e:
-                                logger.warning(f"Error getting pending messages for group {group_name}: {e}")
+                                logger.warning(f"Error getting PEL details for group {group_name}: {e}")
+                            
+                            # Track available unread messages (lag)
+                            stream_info['available_unread'] += lag
                                 
                         stream_info['pending_count'] = pending_count
                         
@@ -397,13 +434,16 @@ def get_queue_info_with_timeout(client, timeout_seconds=10) -> Dict[str, Any]:
                         # If no consumer groups, treat total length as 'pending' (unprocessed)
                         pending_count = total_stream_length
                         stream_info['pending_count'] = pending_count
+                        stream_info['available_unread'] = total_stream_length
                     
-                    # Use pending count if available, otherwise fall back to total length
-                    effective_count = pending_count if pending_count > 0 or len(stream_info['consumer_groups']) > 0 else total_stream_length
+                    # For streams with consumer groups, PEL messages are the real issue
+                    # They're "delivered" but not processed/ACKed yet
+                    effective_count = pending_count if len(stream_info['consumer_groups']) > 0 else total_stream_length
                     
-                    logger.info(f"Stream key '{key}': total_length={total_stream_length}, pending={pending_count}, effective_count={effective_count}")
+                    logger.info(f"Stream '{key}': total={total_stream_length}, PEL_pending={pending_count}, unread={stream_info['available_unread']}, effective={effective_count}")
                     
-                    if effective_count > 0:
+                    # Show all streams, even with 0 effective count, to demonstrate the issue
+                    if total_stream_length > 0 or effective_count > 0:
                         total_messages += effective_count
                         queue_details.append({
                             'name': key,
@@ -423,8 +463,33 @@ def get_queue_info_with_timeout(client, timeout_seconds=10) -> Dict[str, Any]:
         # Sort queue details by length (descending)
         queue_details.sort(key=lambda x: x['length'], reverse=True)
         
-        # Calculate estimated processing time
+        # Calculate PEL-specific statistics
+        total_pel_messages = 0
+        total_streams = 0
+        total_consumer_groups = 0
+        pel_problem_detected = False
+        oldest_pel_age = 0
+        
+        for queue in queue_details:
+            if queue.get('type') == 'stream' and 'stream_info' in queue:
+                total_streams += 1
+                stream_info = queue['stream_info']
+                total_consumer_groups += len(stream_info.get('consumer_groups', []))
+                
+                for pel_detail in stream_info.get('pel_details', []):
+                    pel_count = pel_detail.get('total_pending', 0)
+                    total_pel_messages += pel_count
+                    
+                    # Check for PEL problem (messages older than 30 seconds indicate processing delays)
+                    age_seconds = pel_detail.get('oldest_message_age_seconds', 0)
+                    if pel_count > 0 and age_seconds > 30:
+                        pel_problem_detected = True
+                    oldest_pel_age = max(oldest_pel_age, age_seconds)
+        
+        # Calculate estimated processing time with PEL consideration
         estimated_time = "N/A"
+        pel_backlog_time = "N/A"
+        
         if total_messages > 0:
             # Use the instantaneous ops per second, but provide a conservative estimate
             ops_per_sec = client.info().get('instantaneous_ops_per_sec', 0)
@@ -439,20 +504,53 @@ def get_queue_info_with_timeout(client, timeout_seconds=10) -> Dict[str, Any]:
                 else:
                     estimated_time = f"{estimated_seconds/3600:.1f} hours"
         
-        logger.info(f"✅ Queue scan completed: {total_messages} total messages in {len(queue_details)} queues")
+        # Specific PEL backlog calculation assuming 16-second processing time per message
+        if total_pel_messages > 0:
+            # Based on the scenario: 16 seconds per message processing time
+            pel_processing_seconds = total_pel_messages * 16
+            if pel_processing_seconds < 60:
+                pel_backlog_time = f"{int(pel_processing_seconds)} seconds"
+            elif pel_processing_seconds < 3600:
+                pel_backlog_time = f"{int(pel_processing_seconds/60)} minutes"
+            else:
+                pel_backlog_time = f"{pel_processing_seconds/3600:.1f} hours"
+        
+        logger.info(f"✅ Queue scan completed: {total_messages} total messages ({total_pel_messages} in PEL) across {len(queue_details)} queues")
+        if pel_problem_detected:
+            logger.warning(f"🚨 PEL PROBLEM: {total_pel_messages} messages stuck in PEL, oldest {oldest_pel_age:.1f}s old")
         
         return {
             'total_messages_in_queues': {
                 'value': total_messages,
-                'description': f'Pending/unprocessed messages across {len(queue_details)} detected queues (streams show pending in consumer groups, others show total length)'
+                'description': f'Total pending messages: {total_pel_messages} in PEL (delivered but unprocessed), {total_messages - total_pel_messages} undelivered'
+            },
+            'pel_messages': {
+                'value': total_pel_messages,
+                'description': f'Messages in Pending Entry List (PEL) - delivered to consumers but not yet ACKed. These are the "hidden" queue!'
+            },
+            'pel_problem_indicator': {
+                'value': 'DETECTED' if pel_problem_detected else 'OK',
+                'description': f'PEL accumulation issue detected' if pel_problem_detected else 'No significant PEL accumulation'
+            },
+            'oldest_pending_age': {
+                'value': f"{oldest_pel_age:.1f}s" if oldest_pel_age > 0 else "N/A",
+                'description': 'Age of oldest message in PEL (indicates processing delays)'
+            },
+            'pel_processing_backlog': {
+                'value': pel_backlog_time,
+                'description': f'Time to clear PEL backlog at 16s/message (based on {total_pel_messages} pending messages)'
+            },
+            'stream_summary': {
+                'value': f"{total_streams} streams, {total_consumer_groups} consumer groups",
+                'description': f'Redis streams infrastructure: {total_streams} streams with {total_consumer_groups} consumer groups'
             },
             'queue_details': {
                 'value': queue_details[:10],  # Top 10 queues by size
-                'description': f'Details of top queues (showing {min(10, len(queue_details))} of {len(queue_details)} total)'
+                'description': f'Queue details (showing {min(10, len(queue_details))} of {len(queue_details)} total) - streams show PEL counts'
             },
             'estimated_processing_time': {
                 'value': estimated_time,
-                'description': 'Estimated time to process all queued messages (conservative estimate)'
+                'description': 'General processing time estimate (may not reflect PEL processing delays)'
             }
         }
         

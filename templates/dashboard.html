@@ -413,11 +413,13 @@
             <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px; font-size: 11px; color: #718096; line-height: 1.5;">
                 <div>
                     <strong style="color: #4a5568; display: block; margin-bottom: 8px;">🗄️ Valkey Database Metrics:</strong>
-                    • <strong>Queue Messages:</strong> Pending/unprocessed messages in detected queues. For Redis Streams: shows pending messages in consumer groups. For lists/sets: shows total length. Green (&lt;500), yellow (&lt;1000), red (&gt;1000)<br>
+                    • <strong>🚨 PEL Messages:</strong> Messages in Pending Entry List - delivered to consumers but not ACKed yet. This is the "hidden queue" that causes processing delays!<br>
+                    • <strong>Total Queue:</strong> All pending messages (PEL + undelivered). PEL messages are the real problem in stream processing.<br>
+                    • <strong>Oldest Pending Age:</strong> How long the oldest PEL message has been waiting (indicates consumer processing delays)<br>
+                    • <strong>PEL Backlog Time:</strong> Estimated time to clear all PEL messages at current processing rate (16s/message)<br>
                     • <strong>Hit Ratio:</strong> % of successful key lookups vs total lookups (higher is better for performance)<br>
                     • <strong>Memory:</strong> Current RAM usage by the Valkey database<br>
                     • <strong>Clients:</strong> Number of active client connections<br>
-                    • <strong>Database Size:</strong> Total number of keys stored in the database<br>
                     • <strong>Process Rate:</strong> Commands processed per second (in detailed view)
                 </div>
                 <div>
@@ -493,15 +495,31 @@
             // Helper function to extract value from enhanced structure
             const getValue = (obj) => obj?.value !== undefined ? obj.value : obj;
             
-            // Queue message count with color coding based on volume
+            // PEL-specific metrics - THE KEY ISSUE!
+            const pelMessages = getValue(data.queues?.pel_messages) || 0;
+            const pelProblem = getValue(data.queues?.pel_problem_indicator) || 'OK';
+            const oldestPendingAge = getValue(data.queues?.oldest_pending_age) || 'N/A';
+            const pelBacklogTime = getValue(data.queues?.pel_processing_backlog) || 'N/A';
+            
+            // Color coding for PEL issues
+            const pelColor = pelProblem === 'DETECTED' ? '#e74c3c' : pelMessages > 100 ? '#f39c12' : '#28a745';
+            const pelBgColor = pelProblem === 'DETECTED' ? '#fff5f5' : 'transparent';
+            
+            // Traditional queue count (for comparison)
             const queueCount = getValue(data.queues?.total_messages_in_queues) || 0;
             const queueColor = queueCount > 1000 ? '#e74c3c' : queueCount > 500 ? '#f39c12' : '#28a745';
             
-            // Key metrics for the main line - Queue Messages moved to front as most important
+            // Key metrics for the main line - PEL Messages prominently featured!
             metricsContainer.innerHTML = `
+                <div class="metric" style="background: ${pelBgColor}; border: ${pelProblem === 'DETECTED' ? '2px solid #e74c3c' : 'none'}; border-radius: 8px; padding: ${pelProblem === 'DETECTED' ? '8px' : '0'};">
+                    <div class="metric-label" style="font-weight: ${pelProblem === 'DETECTED' ? '700' : '500'};">🚨 PEL Messages</div>
+                    <div class="metric-value" style="color: ${pelColor}; font-weight: 700;">${formatNumber(pelMessages)}</div>
+                    <div style="font-size: 10px; color: #666; margin-top: 2px;">${pelProblem === 'DETECTED' ? 'PROBLEM!' : 'OK'}</div>
+                </div>
                 <div class="metric">
-                    <div class="metric-label">Queue Messages</div>
+                    <div class="metric-label">Total Queue</div>
                     <div class="metric-value" style="color: ${queueColor}; font-weight: 700;">${formatNumber(queueCount)}</div>
+                    <div style="font-size: 10px; color: #666; margin-top: 2px;">All messages</div>
                 </div>
                 <div class="metric">
                     <div class="metric-label">Hit Ratio</div>
@@ -515,42 +533,81 @@
                     <div class="metric-label">Clients</div>
                     <div class="metric-value">${formatNumber(getValue(data.clients?.connected_clients))}</div>
                 </div>
-                <div class="metric">
-                    <div class="metric-label">Database Size</div>
-                    <div class="metric-value">${formatNumber(getValue(data.database_size))} keys</div>
-                </div>
             `;
             
-            // Detailed metrics for expanded view
+            // Detailed metrics for expanded view - Focus on PEL analysis!
+            let pelDetailsHtml = '';
+            if (pelProblem === 'DETECTED' || pelMessages > 0) {
+                pelDetailsHtml = `
+                    <div style="background: #fff5f5; border: 2px solid #e74c3c; border-radius: 8px; padding: 16px; margin-bottom: 16px;">
+                        <h4 style="color: #e74c3c; margin: 0 0 12px 0; font-size: 14px;">🚨 PEL (Pending Entry List) Analysis</h4>
+                        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; font-size: 12px;">
+                            <div><strong>PEL Messages:</strong> ${formatNumber(pelMessages)} (delivered but not ACKed)</div>
+                            <div><strong>Oldest Pending:</strong> ${oldestPendingAge} (processing delay indicator)</div>
+                            <div><strong>Backlog Time:</strong> ${pelBacklogTime} (at 16s/message)</div>
+                            <div><strong>Stream Summary:</strong> ${getValue(data.queues?.stream_summary) || 'N/A'}</div>
+                        </div>
+                        <div style="margin-top: 12px; padding: 8px; background: white; border-radius: 4px; font-size: 11px; color: #666;">
+                            <strong>📖 PEL Problem Explanation:</strong><br>
+                            • Producer adds messages at 30 FPM × 6 streams = 180 messages/min<br>
+                            • Consumer reads messages (moves to PEL) but takes 16s to process each<br>
+                            • Messages accumulate in PEL waiting for ACK<br>
+                            • Queue appears "empty" but PEL is full of unprocessed messages!
+                        </div>
+                    </div>
+                `;
+            }
+            
             detailsContainer.innerHTML = `
+                ${pelDetailsHtml}
                 <div class="stat-grid">
                     <div class="stat-item">
-                        <span class="stat-label">Process Rate</span>
+                        <span class="stat-label">🚨 PEL Messages</span>
+                        <span class="stat-value" style="color: ${pelColor}; font-weight: 700;">${formatNumber(pelMessages)}</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-label">📊 Total Queue Messages</span>
+                        <span class="stat-value">${formatNumber(queueCount)}</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-label">⏱️ Oldest Pending Age</span>
+                        <span class="stat-value">${oldestPendingAge}</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-label">⏳ PEL Backlog Time</span>
+                        <span class="stat-value">${pelBacklogTime}</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-label">🔄 Process Rate</span>
                         <span class="stat-value">${formatNumber(getValue(data.queues?.process_rate_per_second))} ops/sec</span>
                     </div>
                     <div class="stat-item">
-                        <span class="stat-label">Peak Memory</span>
+                        <span class="stat-label">💾 Peak Memory</span>
                         <span class="stat-value">${getValue(data.memory?.used_memory_peak_human) || 'N/A'}</span>
                     </div>
                     <div class="stat-item">
-                        <span class="stat-label">Blocked Clients</span>
+                        <span class="stat-label">🔒 Blocked Clients</span>
                         <span class="stat-value">${formatNumber(getValue(data.clients?.blocked_clients))}</span>
                     </div>
                     <div class="stat-item">
-                        <span class="stat-label">Total Connections</span>
+                        <span class="stat-label">📡 Total Connections</span>
                         <span class="stat-value">${formatNumber(getValue(data.performance?.total_connections_received))}</span>
                     </div>
                     <div class="stat-item">
-                        <span class="stat-label">Commands Processed</span>
+                        <span class="stat-label">⚡ Commands Processed</span>
                         <span class="stat-value">${formatNumber(getValue(data.performance?.total_commands_processed))}</span>
                     </div>
                     <div class="stat-item">
-                        <span class="stat-label">Uptime</span>
+                        <span class="stat-label">⏰ Uptime</span>
                         <span class="stat-value">${formatUptime(getValue(data.server?.uptime_in_seconds))}</span>
                     </div>
                     <div class="stat-item">
-                        <span class="stat-label">Server Version</span>
+                        <span class="stat-label">🔢 Server Version</span>
                         <span class="stat-value">${getValue(data.server?.redis_version) || 'N/A'}</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-label">📈 Database Size</span>
+                        <span class="stat-value">${formatNumber(getValue(data.database_size))} keys</span>
                     </div>
                 </div>
             `;
