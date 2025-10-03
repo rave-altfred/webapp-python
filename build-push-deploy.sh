@@ -130,7 +130,7 @@ deploy_files_only() {
     # Restart only the webapp container (not nginx)
     ssh -o StrictHostKeyChecking=no root@"${DROPLET_IP}" "
         cd /opt/webapp-python && 
-        docker-compose -f docker-compose.production.yml restart webapp
+        docker compose -f docker-compose.production.yml restart webapp
     " >/dev/null 2>&1
     
     success "Template files deployed and webapp restarted in under 10 seconds!"
@@ -624,11 +624,11 @@ docker pull registry.digitalocean.com/altfred-registry/webapp-python:latest
 
 # Stop existing containers if running
 echo "[INFO] Stopping existing containers..."
-docker-compose -f docker-compose.production.yml down --remove-orphans || true
+docker compose -f docker-compose.production.yml down --remove-orphans || true
 
 # Start new containers
 echo "[INFO] Starting new containers..."
-docker-compose -f docker-compose.production.yml up -d
+docker compose -f docker-compose.production.yml up -d
 
 # Wait for containers to start
 sleep 5
@@ -639,14 +639,14 @@ docker image prune -f || true
 
 # Show status
 echo "[INFO] Container status:"
-docker-compose -f docker-compose.production.yml ps
+docker compose -f docker-compose.production.yml ps
 
 # Show recent logs
 echo "[INFO] Recent application logs:"
-docker-compose -f docker-compose.production.yml logs webapp --tail=5
+docker compose -f docker-compose.production.yml logs webapp --tail=5
 
 echo "[INFO] Recent nginx logs:"
-docker-compose -f docker-compose.production.yml logs nginx --tail=5
+docker compose -f docker-compose.production.yml logs nginx --tail=5
 
 echo "[SUCCESS] Deployment completed successfully!"
 EOF
@@ -707,7 +707,7 @@ health_check() {
     error "Health check failed after ${max_attempts} attempts"
     warning "The application may still be starting up. You can check manually:"
     warning "  curl -k https://${DROPLET_IP}/health"
-    warning "  ssh root@${DROPLET_IP} 'cd /opt/webapp-python && docker-compose -f docker-compose.production.yml logs webapp'"
+    warning "  ssh root@${DROPLET_IP} 'cd /opt/webapp-python && docker compose -f docker-compose.production.yml logs webapp'"
     return 1
 }
 
@@ -729,9 +729,9 @@ show_deployment_info() {
     echo "  🖥️  Droplet: ${DROPLET_NAME} (${DROPLET_IP})"
     echo ""
     echo "  📋 Useful Commands:"
-    echo "    • Check logs: ssh root@${DROPLET_IP} 'cd /opt/webapp-python && docker-compose -f docker-compose.production.yml logs -f'"
-    echo "    • Restart app: ssh root@${DROPLET_IP} 'cd /opt/webapp-python && docker-compose -f docker-compose.production.yml restart'"
-    echo "    • Check status: ssh root@${DROPLET_IP} 'cd /opt/webapp-python && docker-compose -f docker-compose.production.yml ps'"
+    echo "    • Check logs: ssh root@${DROPLET_IP} 'cd /opt/webapp-python && docker compose -f docker-compose.production.yml logs -f'"
+    echo "    • Restart app: ssh root@${DROPLET_IP} 'cd /opt/webapp-python && docker compose -f docker-compose.production.yml restart'"
+    echo "    • Check status: ssh root@${DROPLET_IP} 'cd /opt/webapp-python && docker compose -f docker-compose.production.yml ps'"
     echo ""
 }
 
