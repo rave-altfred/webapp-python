@@ -1,6 +1,7 @@
 """
 Database Statistics Dashboard
 A Flask web application to display Valkey and PostgreSQL database statistics.
+Updated with individual service refresh buttons.
 """
 
 import json
