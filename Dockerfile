@@ -1,34 +1,39 @@
+# syntax=docker/dockerfile:1.4
 # Multi-stage build for Flask webapp
 FROM python:3.11-slim as deps
-
-# Install system dependencies in a separate layer for better caching
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    gcc \
-    libpq-dev \
-    curl \
-    && rm -rf /var/lib/apt/lists/*
 
 # Set working directory
 WORKDIR /app
 
+# Install system dependencies with cache mount for faster rebuilds
+RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
+    --mount=type=cache,target=/var/lib/apt,sharing=locked \
+    apt-get update && apt-get install -y --no-install-recommends \
+    gcc \
+    libpq-dev \
+    curl
+
 # Copy requirements first to leverage Docker layer caching
 COPY requirements.txt .
 
-# Create virtual environment and install dependencies
-RUN python -m venv /opt/venv
+# Create virtual environment and install dependencies with pip cache
+RUN --mount=type=cache,target=/root/.cache/pip \
+    python -m venv /opt/venv && \
+    . /opt/venv/bin/activate && \
+    pip install --upgrade pip && \
+    pip install -r requirements.txt
+
 ENV PATH="/opt/venv/bin:$PATH"
-RUN pip install --upgrade pip && \
-    pip install --no-cache-dir -r requirements.txt
 
 # Production stage
 FROM python:3.11-slim as production
 
-# Install runtime dependencies
-RUN apt-get update && apt-get install -y --no-install-recommends \
+# Install runtime dependencies with cache mount
+RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
+    --mount=type=cache,target=/var/lib/apt,sharing=locked \
+    apt-get update && apt-get install -y --no-install-recommends \
     libpq5 \
-    curl \
-    && rm -rf /var/lib/apt/lists/* \
-    && apt-get clean
+    curl
 
 # Create non-root user
 RUN groupadd -r webapp && useradd -r -g webapp webapp
