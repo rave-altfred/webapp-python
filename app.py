@@ -1148,6 +1148,56 @@ def get_rtsp_reader_stats() -> Dict[str, Any]:
         logger.error(f"❌ Error getting RTSP Reader stats: {e}")
         return {'error': f'Error retrieving RTSP Reader statistics: {str(e)}'}
 
+def get_cv_service_stats() -> Dict[str, Any]:
+    """Get CV service statistics from health endpoint."""
+    logger.info("🎯 Starting get_cv_service_stats()")
+    
+    try:
+        # Make request to CV service health endpoint
+        response = requests.get('https://cv.altfred.com/health', timeout=5)
+        response.raise_for_status()
+        
+        raw_data = response.json()
+        
+        # Structure the data with descriptions and enhanced metrics
+        stats = {
+            'service_info': {
+                'status': raw_data.get('status', 'unknown'),
+                'service': raw_data.get('service', 'cv-plugin-python'),
+                'version': raw_data.get('version', 'unknown'),
+                'uptime': raw_data.get('uptime', 'N/A'),
+                'description': 'Computer vision service health and runtime information'
+            },
+            'valkey': {
+                'status': raw_data.get('valkey', {}).get('status', 'unknown'),
+                'connected': raw_data.get('valkey', {}).get('connected', False),
+                'errors': raw_data.get('valkey', {}).get('errors', []),
+                'description': 'CV service Valkey connection status'
+            },
+            'processing': {
+                'messages_processed': raw_data.get('processing', {}).get('messages_processed', 0),
+                'consumer_running': raw_data.get('processing', {}).get('consumer_running', False),
+                'description': 'Message processing statistics and consumer status'
+            },
+            'system': {
+                'platform': raw_data.get('system', {}).get('platform', 'unknown'),
+                'python_version': raw_data.get('system', {}).get('python_version', 'unknown'),
+                'cpu_usage_percent': raw_data.get('system', {}).get('cpu_usage_percent', 0),
+                'memory': raw_data.get('system', {}).get('memory', {}),
+                'description': 'System resource usage and platform information'
+            }
+        }
+        
+        logger.info("✅ Successfully gathered CV service statistics")
+        return stats
+        
+    except requests.exceptions.RequestException as e:
+        logger.error(f"❌ Error connecting to CV service: {e}")
+        return {'error': f'Cannot connect to CV service: {str(e)}'}
+    except Exception as e:
+        logger.error(f"❌ Error getting CV service stats: {e}")
+        return {'error': f'Error retrieving CV service statistics: {str(e)}'}
+
 def format_uptime(seconds: float) -> str:
     """Format uptime seconds into a human-readable string."""
     if not seconds or seconds <= 0:
@@ -1180,11 +1230,13 @@ def api_stats():
     valkey_stats = get_valkey_stats()
     postgres_stats = get_postgres_stats()
     rtsp_reader_stats = get_rtsp_reader_stats()
+    cv_service_stats = get_cv_service_stats()
     
     return jsonify({
         'valkey': valkey_stats,
         'postgres': postgres_stats,
         'rtsp_reader': rtsp_reader_stats,
+        'cv_service': cv_service_stats,
         'timestamp': datetime.utcnow().isoformat()
     })
 
@@ -1218,6 +1270,19 @@ def api_rtsp_reader():
         return jsonify(stats)
     except Exception as e:
         logger.error(f"❌ Error in /api/rtsp-reader endpoint: {e}")
+        return jsonify({'error': f'API error: {str(e)}'}), 500
+
+@app.route('/api/cv-service')
+@requires_auth
+def api_cv_service():
+    """API endpoint to get CV service statistics."""
+    logger.info("🌐 API /api/cv-service endpoint called")
+    try:
+        stats = get_cv_service_stats()
+        logger.info(f"📋 Returning CV service stats: {len(str(stats))} characters")
+        return jsonify(stats)
+    except Exception as e:
+        logger.error(f"❌ Error in /api/cv-service endpoint: {e}")
         return jsonify({'error': f'API error: {str(e)}'}), 500
 
 @app.route('/observations')

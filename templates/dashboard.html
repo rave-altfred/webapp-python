@@ -410,6 +410,40 @@
         </div>
 
         <div class="services-container">
+            <!-- RTSP Reader Service Line -->
+            <div class="service-line" id="rtsp-reader-service">
+                <div class="service-header">
+                    <div class="service-icon rtsp-icon">📹</div>
+                    <h2 class="service-title">RTSP Reader Service</h2>
+                    <span id="rtsp-reader-status" class="status-indicator">...</span>
+                    <button id="rtsp-reader-refresh-btn" class="service-refresh-btn" onclick="refreshService('rtsp-reader')" title="Refresh RTSP Reader data">🔄</button>
+                    <button class="expand-toggle" onclick="toggleDetails('rtsp-reader-service')">▼ Details</button>
+                </div>
+                <div id="rtsp-reader-metrics" class="service-metrics">
+                    <!-- Metrics will be populated by JavaScript -->
+                </div>
+                <div class="service-details" id="rtsp-reader-details">
+                    <!-- Detailed stats will be populated by JavaScript -->
+                </div>
+            </div>
+
+            <!-- CV Service Line -->
+            <div class="service-line" id="cv-service">
+                <div class="service-header">
+                    <div class="service-icon cv-icon">🎯</div>
+                    <h2 class="service-title">Computer Vision Service</h2>
+                    <span id="cv-service-status" class="status-indicator">...</span>
+                    <button id="cv-service-refresh-btn" class="service-refresh-btn" onclick="refreshService('cv-service')" title="Refresh CV Service data">🔄</button>
+                    <button class="expand-toggle" onclick="toggleDetails('cv-service')">▼ Details</button>
+                </div>
+                <div id="cv-service-metrics" class="service-metrics">
+                    <!-- Metrics will be populated by JavaScript -->
+                </div>
+                <div class="service-details" id="cv-service-details">
+                    <!-- Detailed stats will be populated by JavaScript -->
+                </div>
+            </div>
+
             <!-- Valkey Service Line -->
             <div class="service-line" id="valkey-service">
                 <div class="service-header">
@@ -443,29 +477,31 @@
                     <!-- Detailed stats will be populated by JavaScript -->
                 </div>
             </div>
-
-            <!-- RTSP Reader Service Line -->
-            <div class="service-line" id="rtsp-reader-service">
-                <div class="service-header">
-                    <div class="service-icon rtsp-icon">📹</div>
-                    <h2 class="service-title">RTSP Reader Service</h2>
-                    <span id="rtsp-reader-status" class="status-indicator">...</span>
-                    <button id="rtsp-reader-refresh-btn" class="service-refresh-btn" onclick="refreshService('rtsp-reader')" title="Refresh RTSP Reader data">🔄</button>
-                    <button class="expand-toggle" onclick="toggleDetails('rtsp-reader-service')">▼ Details</button>
-                </div>
-                <div id="rtsp-reader-metrics" class="service-metrics">
-                    <!-- Metrics will be populated by JavaScript -->
-                </div>
-                <div class="service-details" id="rtsp-reader-details">
-                    <!-- Detailed stats will be populated by JavaScript -->
-                </div>
-            </div>
         </div>
 
         <!-- Metric Explanations Section -->
         <div style="margin-top: 40px; padding: 20px; background: white; border-radius: 12px; border: 1px solid #e2e8f0;">
             <h3 style="margin: 0 0 16px 0; font-size: 1rem; font-weight: 600; color: #4a5568; border-bottom: 1px solid #e2e8f0; padding-bottom: 8px;">📚 Metric Explanations</h3>
             <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px; font-size: 11px; color: #718096; line-height: 1.5;">
+                <div>
+                    <strong style="color: #4a5568; display: block; margin-bottom: 8px;">📹 RTSP Reader Metrics:</strong>
+                    • <strong>Service Status:</strong> Overall health status of the RTSP Reader service<br>
+                    • <strong>Uptime:</strong> Time since last service restart<br>
+                    • <strong>Streams:</strong> Total configured vs actively running RTSP streams<br>
+                    • <strong>Publisher:</strong> Message publisher connection status and performance<br>
+                    • <strong>Circuit Breaker:</strong> Protection mechanism status (Closed = normal, Open = error protection)<br>
+                    • <strong>Queue Stats:</strong> Message publishing queue size and error counts
+                </div>
+                <div>
+                    <strong style="color: #4a5568; display: block; margin-bottom: 8px;">🎯 Computer Vision Service Metrics:</strong>
+                    • <strong>Service Status:</strong> Overall health of the CV processing service (healthy/degraded/unhealthy)<br>
+                    • <strong>Valkey Connection:</strong> Connection status to Valkey message queue (connected/degraded/disconnected)<br>
+                    • <strong>Consumer Status:</strong> Whether the message consumer is actively processing frames (running/stopped)<br>
+                    • <strong>Messages Processed:</strong> Total number of frames processed by the CV pipeline<br>
+                    • <strong>Memory Usage:</strong> Current RAM usage percentage (warning &gt;60%, critical &gt;80%)<br>
+                    • <strong>CPU Usage:</strong> Current processor utilization by the service<br>
+                    • <strong>Uptime:</strong> Time since last service restart
+                </div>
                 <div>
                     <strong style="color: #4a5568; display: block; margin-bottom: 8px;">🗄️ Valkey Database Metrics:</strong>
                     • <strong>🚨 PEL Messages:</strong> Messages in Pending Entry List - delivered to consumers but not ACKed yet. This is the "hidden queue" that causes processing delays!<br>
@@ -494,15 +530,6 @@
                     • <strong>Health Status:</strong> Good (&lt;10% dead), Fair (&lt;20% dead), Needs Vacuum (&gt;20% dead)<br>
                     • <strong>Bloat %:</strong> Ratio of dead tuples to live tuples (indicates need for maintenance)<br>
                     • <strong>Operations:</strong> Total INSERT/UPDATE/DELETE operations since last statistics reset
-                </div>
-                <div>
-                    <strong style="color: #4a5568; display: block; margin-bottom: 8px;">📹 RTSP Reader Metrics:</strong>
-                    • <strong>Service Status:</strong> Overall health status of the RTSP Reader service<br>
-                    • <strong>Uptime:</strong> Time since last service restart<br>
-                    • <strong>Streams:</strong> Total configured vs actively running RTSP streams<br>
-                    • <strong>Publisher:</strong> Message publisher connection status and performance<br>
-                    • <strong>Circuit Breaker:</strong> Protection mechanism status (Closed = normal, Open = error protection)<br>
-                    • <strong>Queue Stats:</strong> Message publishing queue size and error counts
                 </div>
             </div>
         </div>
@@ -879,6 +906,118 @@
             `;
         }
 
+        function renderCvServiceStats(data) {
+            const metricsContainer = document.getElementById('cv-service-metrics');
+            const detailsContainer = document.getElementById('cv-service-details');
+            const status = document.getElementById('cv-service-status');
+            
+            if (data.error) {
+                metricsContainer.innerHTML = `<div class="error-message">❌ ${data.error}</div>`;
+                status.textContent = 'ERROR';
+                status.className = 'status-indicator status-error';
+                return;
+            }
+
+            // Determine overall status
+            const serviceStatus = data.service_info?.status || 'unknown';
+            const valkeyConnected = data.valkey?.connected || false;
+            const consumerRunning = data.processing?.consumer_running || false;
+            const valkeyErrors = data.valkey?.errors || [];
+            const valkeyDegraded = data.valkey?.status === 'degraded';
+            
+            if (serviceStatus === 'healthy' && valkeyConnected && consumerRunning && !valkeyDegraded) {
+                status.textContent = 'HEALTHY';
+                status.className = 'status-indicator status-connected';
+            } else if (valkeyDegraded || valkeyErrors.length > 0) {
+                status.textContent = 'DEGRADED';
+                status.className = 'status-indicator status-error';
+            } else {
+                status.textContent = 'WARNING';
+                status.className = 'status-indicator status-error';
+            }
+            
+            // Helper function to get nested values
+            const getValue = (obj, fallback = 'N/A') => obj !== null && obj !== undefined ? obj : fallback;
+            
+            // Status colors
+            const valkeyStatusColor = valkeyConnected && !valkeyDegraded ? '#28a745' : valkeyDegraded ? '#f39c12' : '#e74c3c';
+            const consumerColor = consumerRunning ? '#28a745' : '#e74c3c';
+            const memoryPercent = data.system?.memory?.used_percent || 0;
+            const memoryColor = memoryPercent > 80 ? '#e74c3c' : memoryPercent > 60 ? '#f39c12' : '#28a745';
+            
+            // Key metrics for the main line
+            metricsContainer.innerHTML = `
+                <div class="metric">
+                    <div class="metric-label">Service</div>
+                    <div class="metric-value" style="color: ${serviceStatus === 'healthy' ? '#28a745' : '#e74c3c'};">${getValue(serviceStatus).toUpperCase()}</div>
+                </div>
+                <div class="metric">
+                    <div class="metric-label">Valkey</div>
+                    <div class="metric-value" style="color: ${valkeyStatusColor};">${valkeyDegraded ? 'DEGRADED' : valkeyConnected ? 'CONNECTED' : 'DISCONNECTED'}</div>
+                </div>
+                <div class="metric">
+                    <div class="metric-label">Consumer</div>
+                    <div class="metric-value" style="color: ${consumerColor};">${consumerRunning ? 'RUNNING' : 'STOPPED'}</div>
+                </div>
+                <div class="metric">
+                    <div class="metric-label">Messages Processed</div>
+                    <div class="metric-value">${formatNumber(getValue(data.processing?.messages_processed, 0))}</div>
+                </div>
+                <div class="metric">
+                    <div class="metric-label">Memory</div>
+                    <div class="metric-value" style="color: ${memoryColor};">${memoryPercent.toFixed(1)}%</div>
+                </div>
+                <div class="metric">
+                    <div class="metric-label">Uptime</div>
+                    <div class="metric-value">${getValue(data.service_info?.uptime)}</div>
+                </div>
+            `;
+            
+            // Format Valkey errors section
+            let valkeyErrorsHtml = '';
+            if (valkeyErrors.length > 0) {
+                valkeyErrorsHtml = `
+                    <div style="margin: 20px 0; padding: 15px; background: #fff3cd; border-radius: 8px; border-left: 4px solid #f39c12;">
+                        <h4 style="margin: 0 0 10px 0; color: #856404;">⚠️ Valkey Issues</h4>
+                        <div style="font-size: 12px; color: #856404;">
+                            ${valkeyErrors.map(err => `<div>• ${err}</div>`).join('')}
+                        </div>
+                    </div>
+                `;
+            }
+            
+            // Detailed metrics for expanded view
+            detailsContainer.innerHTML = `
+                <div class="stat-grid">
+                    <div class="stat-item">
+                        <span class="stat-label">Version</span>
+                        <span class="stat-value">${getValue(data.service_info?.version)}</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-label">Platform</span>
+                        <span class="stat-value">${getValue(data.system?.platform)}</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-label">Python Version</span>
+                        <span class="stat-value">${getValue(data.system?.python_version)}</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-label">CPU Usage</span>
+                        <span class="stat-value">${getValue(data.system?.cpu_usage_percent, 0).toFixed(1)}%</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-label">Memory Available</span>
+                        <span class="stat-value">${getValue(data.system?.memory?.available_gb, 0).toFixed(2)} GB</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-label">Memory Total</span>
+                        <span class="stat-value">${getValue(data.system?.memory?.total_gb, 0).toFixed(2)} GB</span>
+                    </div>
+                </div>
+                ${valkeyErrorsHtml}
+            `;
+        }
+
         let isRefreshing = false;
 
         function refreshData() {
@@ -889,6 +1028,7 @@
             const valkeyStatus = document.getElementById('valkey-status');
             const postgresStatus = document.getElementById('postgres-status');
             const rtspReaderStatus = document.getElementById('rtsp-reader-status');
+            const cvServiceStatus = document.getElementById('cv-service-status');
             
             // Show loading indicators without clearing content
             refreshBtn.textContent = '🔄 Refreshing...';
@@ -896,6 +1036,7 @@
             valkeyStatus.classList.add('status-updating');
             postgresStatus.classList.add('status-updating');
             rtspReaderStatus.classList.add('status-updating');
+            cvServiceStatus.classList.add('status-updating');
             
             fetch('/api/stats')
                 .then(response => response.json())
@@ -903,6 +1044,7 @@
                     renderValkeyStats(data.valkey);
                     renderPostgresStats(data.postgres);
                     renderRtspReaderStats(data.rtsp_reader);
+                    renderCvServiceStats(data.cv_service);
                     document.getElementById('last-updated').textContent = 
                         `Last updated: ${new Date(data.timestamp).toLocaleString()}`;
                 })
@@ -912,6 +1054,7 @@
                     showErrorOverlay('valkey-metrics', 'Error loading Valkey statistics');
                     showErrorOverlay('postgres-metrics', 'Error loading PostgreSQL statistics');
                     showErrorOverlay('rtsp-reader-metrics', 'Error loading RTSP Reader statistics');
+                    showErrorOverlay('cv-service-metrics', 'Error loading CV Service statistics');
                 })
                 .finally(() => {
                     // Reset loading state
@@ -921,6 +1064,7 @@
                     valkeyStatus.classList.remove('status-updating');
                     postgresStatus.classList.remove('status-updating');
                     rtspReaderStatus.classList.remove('status-updating');
+                    cvServiceStatus.classList.remove('status-updating');
                 });
         }
         
@@ -935,7 +1079,14 @@
             serviceRefreshBtn.classList.add('loading');
             serviceStatus.classList.add('status-updating');
             
-            const apiEndpoint = service === 'rtsp-reader' ? '/api/rtsp_reader' : `/api/${service}`;
+            let apiEndpoint;
+            if (service === 'rtsp-reader') {
+                apiEndpoint = '/api/rtsp-reader';
+            } else if (service === 'cv-service') {
+                apiEndpoint = '/api/cv-service';
+            } else {
+                apiEndpoint = `/api/${service}`;
+            }
             
             fetch(apiEndpoint)
                 .then(response => response.json())
@@ -953,6 +1104,9 @@
                             break;
                         case 'rtsp-reader':
                             renderRtspReaderStats(data);
+                            break;
+                        case 'cv-service':
+                            renderCvServiceStats(data);
                             break;
                     }
                     
