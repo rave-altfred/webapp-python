@@ -671,6 +671,10 @@
                     <span>Tracking</span>
                 </label>
                 <label class="column-toggle">
+                    <input type="checkbox" class="column-checkbox" data-column="image_path">
+                    <span>Image Path</span>
+                </label>
+                <label class="column-toggle">
                     <input type="checkbox" class="column-checkbox" data-column="created_at" checked>
                     <span>Created</span>
                 </label>
@@ -736,6 +740,7 @@
             { key: 'confidence', label: 'Confidence', sortable: true },
             { key: 'bbox', label: 'BBox', sortable: false },
             { key: 'tracking_id', label: 'Tracking ID', sortable: true },
+            { key: 'image_path', label: 'Image Path', sortable: true },
             { key: 'created_at', label: 'Created At', sortable: true }
         ];
 
@@ -851,6 +856,15 @@
                             break;
                         case 'ts_start':
                             td.innerHTML = `<span class="timestamp">${formatTimestamp(obs.ts_start)}</span>`;
+                            break;
+                        case 'image_path':
+                            if (obs.image_path) {
+                                // Extract filename from path for display
+                                const filename = obs.image_path.split('/').pop();
+                                td.innerHTML = `<span style="font-size: 12px; word-break: break-all;" title="${obs.image_path}">${filename}</span>`;
+                            } else {
+                                td.textContent = 'N/A';
+                            }
                             break;
                         default:
                             td.textContent = obs[col.key] !== null && obs[col.key] !== undefined ? obs[col.key] : 'N/A';
