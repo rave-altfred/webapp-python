@@ -520,15 +520,12 @@ def get_queue_info_with_timeout(client, timeout_seconds=10) -> Dict[str, Any]:
                         stream_info['pending_count'] = pending_count
                         stream_info['available_unread'] = total_stream_length
                     
-                    # For streams with consumer groups, count BOTH PEL and undelivered messages
-                    # PEL = delivered but not ACKed (the main issue you mentioned)
-                    # Undelivered = in stream but not yet delivered to consumers (lag)
-                    if len(stream_info['consumer_groups']) > 0:
-                        # Count both PEL messages AND undelivered messages (lag)
-                        effective_count = pending_count + stream_info['available_unread']
-                    else:
-                        # No consumer groups, so all messages are unprocessed
-                        effective_count = total_stream_length
+                    # For streams, the total length (XLEN) represents ALL messages in the stream
+                    # This includes both:
+                    # - PEL messages (delivered but not ACKed)
+                    # - Undelivered messages (lag - not yet read by consumers)
+                    # We should use total_stream_length as the true queue count
+                    effective_count = total_stream_length
                     
                     logger.info(f"Stream '{key}': total={total_stream_length}, PEL_pending={pending_count}, unread={stream_info['available_unread']}, effective={effective_count}")
                     
@@ -637,7 +634,7 @@ def get_queue_info_with_timeout(client, timeout_seconds=10) -> Dict[str, Any]:
         return {
             'total_messages_in_queues': {
                 'value': total_messages,
-                'description': f'Total queue messages: {total_pel_messages} in PEL (delivered but unprocessed) + {total_undelivered_messages} undelivered = {total_messages} total'
+                'description': f'Total stream length (all messages): includes {total_pel_messages} in PEL (delivered but not ACKed) + {total_undelivered_messages} undelivered'
             },
             'pel_messages': {
                 'value': total_pel_messages,
