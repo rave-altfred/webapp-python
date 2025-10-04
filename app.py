@@ -1313,46 +1313,41 @@ def api_observations():
         params = []
         
         if search:
-            # Handle special client_id filter syntax: client_id:value
-            if search.startswith('client_id:'):
-                client_id = search.replace('client_id:', '').strip()
+            # Parse search string for special filters
+            parts = search.split()
+            client_filter = None
+            date_filter = None
+            search_terms = []
+            
+            for part in parts:
+                if part.startswith('client_id:'):
+                    client_filter = part.replace('client_id:', '').strip()
+                elif part.startswith('created_at:>='):
+                    # Extract date from created_at:>=ISO_DATE
+                    date_filter = part.replace('created_at:>=', '').strip()
+                else:
+                    search_terms.append(part)
+            
+            # Add client filter
+            if client_filter:
                 where_conditions.append("client_id = %s")
-                params.append(client_id)
-            elif 'client_id:' in search:
-                # Handle mixed search with client filter
-                parts = search.split()
-                client_filter = None
-                search_terms = []
-                
-                for part in parts:
-                    if part.startswith('client_id:'):
-                        client_filter = part.replace('client_id:', '').strip()
-                    else:
-                        search_terms.append(part)
-                
-                if client_filter:
-                    where_conditions.append("client_id = %s")
-                    params.append(client_filter)
-                
-                if search_terms:
-                    search_text = ' '.join(search_terms)
-                    search_fields = [
-                        'job_id', 'stream_id', 'observation_type', 'object_class'
-                    ]
-                    search_conditions = []
-                    for field in search_fields:
-                        search_conditions.append(f"{field}::text ILIKE %s")
-                        params.append(f'%{search_text}%')
-                    where_conditions.append(f"({' OR '.join(search_conditions)})")
-            else:
-                # Regular search across multiple text fields
+                params.append(client_filter)
+            
+            # Add date filter
+            if date_filter:
+                where_conditions.append("created_at >= %s")
+                params.append(date_filter)
+            
+            # Add text search if there are search terms
+            if search_terms:
+                search_text = ' '.join(search_terms)
                 search_fields = [
-                    'job_id', 'client_id', 'stream_id', 'observation_type', 'object_class'
+                    'job_id', 'stream_id', 'observation_type', 'object_class'
                 ]
                 search_conditions = []
                 for field in search_fields:
                     search_conditions.append(f"{field}::text ILIKE %s")
-                    params.append(f'%{search}%')
+                    params.append(f'%{search_text}%')
                 where_conditions.append(f"({' OR '.join(search_conditions)})")
         
         where_clause = 'WHERE ' + ' AND '.join(where_conditions) if where_conditions else ''
