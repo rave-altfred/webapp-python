@@ -5,6 +5,22 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Observations - System Dashboard</title>
     <style>
+        /* Dracula Theme Colors */
+        :root {
+            --dracula-bg: #282a36;
+            --dracula-current-line: #44475a;
+            --dracula-selection: #44475a;
+            --dracula-fg: #f8f8f2;
+            --dracula-comment: #6272a4;
+            --dracula-cyan: #8be9fd;
+            --dracula-green: #50fa7b;
+            --dracula-orange: #ffb86c;
+            --dracula-pink: #ff79c6;
+            --dracula-purple: #bd93f9;
+            --dracula-red: #ff5555;
+            --dracula-yellow: #f1fa8c;
+        }
+
         * {
             margin: 0;
             padding: 0;
@@ -13,11 +29,11 @@
 
         body {
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
-            background: #f5f7fa;
+            background: var(--dracula-bg);
             min-height: 100vh;
             padding: 0;
             margin: 0;
-            color: #2d3748;
+            color: var(--dracula-fg);
             line-height: 1.5;
             /* Smooth scrolling optimizations */
             scroll-behavior: smooth;
@@ -31,21 +47,21 @@
         }
 
         .header {
-            background: white;
+            background: var(--dracula-current-line);
             padding: 30px;
             margin: -20px -20px 30px -20px;
-            border-bottom: 1px solid #e2e8f0;
+            border-bottom: 1px solid var(--dracula-selection);
         }
 
         .header h1 {
-            color: #2d3748;
+            color: var(--dracula-purple);
             font-size: 2rem;
             margin: 0 0 8px 0;
             font-weight: 600;
         }
 
         .header p {
-            color: #718096;
+            color: var(--dracula-comment);
             font-size: 1rem;
             margin: 0;
         }
@@ -55,11 +71,11 @@
         }
 
         .nav-links a {
-            color: #4a5568;
+            color: var(--dracula-cyan);
             text-decoration: none;
             margin: 0 8px 0 0;
             padding: 8px 16px;
-            border: 1px solid #e2e8f0;
+            border: 1px solid var(--dracula-selection);
             border-radius: 6px;
             transition: all 0.2s ease;
             font-size: 14px;
@@ -67,17 +83,17 @@
         }
 
         .nav-links a:hover {
-            background: #f7fafc;
-            border-color: #cbd5e0;
+            background: var(--dracula-selection);
+            border-color: var(--dracula-purple);
         }
 
         .controls-panel {
-            background: white;
+            background: var(--dracula-current-line);
             border-radius: 8px;
             padding: 20px;
             margin-bottom: 20px;
-            border: 1px solid #e2e8f0;
-            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+            border: 1px solid var(--dracula-selection);
+            box-shadow: 0 2px 8px rgba(189, 147, 249, 0.2);
         }
 
         .controls-row {
@@ -96,23 +112,26 @@
         .search-box input {
             width: 100%;
             padding: 12px 16px;
-            border: 1px solid #e2e8f0;
+            border: 1px solid var(--dracula-selection);
             border-radius: 8px;
             font-size: 14px;
             transition: border-color 0.2s ease;
+            background: var(--dracula-bg);
+            color: var(--dracula-fg);
         }
 
         .search-box input:focus {
             outline: none;
-            border-color: #4299e1;
-            box-shadow: 0 0 0 3px rgba(66, 153, 225, 0.1);
+            border-color: var(--dracula-purple);
+            box-shadow: 0 0 0 3px rgba(189, 147, 249, 0.2);
         }
 
         .page-size-select {
             padding: 12px 16px;
-            border: 1px solid #e2e8f0;
+            border: 1px solid var(--dracula-selection);
             border-radius: 8px;
-            background: white;
+            background: var(--dracula-bg);
+            color: var(--dracula-fg);
             cursor: pointer;
             font-size: 14px;
             transition: border-color 0.2s ease;
@@ -120,12 +139,12 @@
 
         .page-size-select:focus {
             outline: none;
-            border-color: #4299e1;
+            border-color: var(--dracula-purple);
         }
 
         .refresh-btn {
-            background: #4299e1;
-            color: white;
+            background: var(--dracula-purple);
+            color: var(--dracula-bg);
             border: none;
             padding: 12px 24px;
             border-radius: 8px;
@@ -136,7 +155,7 @@
         }
 
         .refresh-btn:hover {
-            background: #3182ce;
+            background: var(--dracula-pink);
             transform: translateY(-1px);
         }
 
@@ -159,11 +178,11 @@
         }
 
         .table-container {
-            background: white;
+            background: var(--dracula-current-line);
             border-radius: 8px;
             overflow: hidden;
-            border: 1px solid #e2e8f0;
-            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+            border: 1px solid var(--dracula-selection);
+            box-shadow: 0 2px 8px rgba(189, 147, 249, 0.2);
             /* Performance optimizations */
             contain: layout style paint;
             will-change: scroll-position;
@@ -178,21 +197,21 @@
         }
 
         .observations-table th {
-            background: #f8f9fa;
-            color: #4a5568;
+            background: var(--dracula-selection);
+            color: var(--dracula-purple);
             padding: 16px 12px;
             text-align: left;
             font-weight: 600;
             cursor: pointer;
             user-select: none;
             position: relative;
-            border-bottom: 1px solid #e2e8f0;
+            border-bottom: 1px solid var(--dracula-current-line);
             transition: background-color 0.2s ease;
             font-size: 14px;
         }
 
         .observations-table th:hover {
-            background: #f1f5f9;
+            background: var(--dracula-current-line);
         }
 
         .observations-table th.sortable::after {
@@ -205,23 +224,24 @@
 
         .observations-table th.sort-asc::after {
             content: '↑';
-            color: #4299e1;
+            color: var(--dracula-cyan);
             opacity: 1;
             font-weight: bold;
         }
 
         .observations-table th.sort-desc::after {
             content: '↓';
-            color: #4299e1;
+            color: var(--dracula-cyan);
             opacity: 1;
             font-weight: bold;
         }
 
         .observations-table td {
             padding: 12px;
-            border-bottom: 1px solid #e2e8f0;
+            border-bottom: 1px solid var(--dracula-selection);
             vertical-align: top;
             font-size: 14px;
+            color: var(--dracula-fg);
         }
 
         .observations-table tr {
@@ -231,7 +251,7 @@
         }
         
         .observations-table tr:hover {
-            background-color: #f7fafc;
+            background-color: var(--dracula-bg);
         }
 
         .image-cell {
@@ -251,8 +271,8 @@
         }
         
         .observation-image[data-src] {
-            background: #f7fafc;
-            background-image: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="%23cbd5e0"><path d="M19 3H5C3.9 3 3 3.9 3 5V19C3 20.1 3.9 21 5 21H19C20.1 21 21 20.1 21 19V5C21 3.9 20.1 3 19 3ZM19 19H5V5H19V19ZM13.96 12.29L11.21 15.83L9.25 13.47L6.5 17H17.5L13.96 12.29Z"/></svg>');
+            background: var(--dracula-selection);
+            background-image: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="%236272a4"><path d="M19 3H5C3.9 3 3 3.9 3 5V19C3 20.1 3.9 21 5 21H19C20.1 21 21 20.1 21 19V5C21 3.9 20.1 3 19 3ZM19 19H5V5H19V19ZM13.96 12.29L11.21 15.83L9.25 13.47L6.5 17H17.5L13.96 12.29Z"/></svg>');
             background-repeat: no-repeat;
             background-position: center;
             background-size: 24px 24px;
@@ -264,7 +284,7 @@
 
         .bbox-info {
             font-size: 11px;
-            color: #666;
+            color: var(--dracula-comment);
             margin-top: 4px;
         }
 
@@ -277,18 +297,18 @@
             color: white;
         }
 
-        .confidence-high { background: #48bb78; }
-        .confidence-medium { background: #ed8936; }
-        .confidence-low { background: #f56565; }
+        .confidence-high { background: var(--dracula-green); color: var(--dracula-bg); }
+        .confidence-medium { background: var(--dracula-orange); color: var(--dracula-bg); }
+        .confidence-low { background: var(--dracula-red); color: var(--dracula-bg); }
 
         .observation-type {
             font-weight: 600;
-            color: #4299e1;
+            color: var(--dracula-cyan);
         }
 
         .timestamp {
             font-size: 12px;
-            color: #666;
+            color: var(--dracula-comment);
         }
 
         .pagination {
@@ -297,14 +317,15 @@
             align-items: center;
             padding: 20px;
             gap: 8px;
-            background: white;
-            border-top: 1px solid #e2e8f0;
+            background: var(--dracula-current-line);
+            border-top: 1px solid var(--dracula-selection);
         }
 
         .pagination button {
             padding: 8px 16px;
-            border: 1px solid #e2e8f0;
-            background: white;
+            border: 1px solid var(--dracula-selection);
+            background: var(--dracula-bg);
+            color: var(--dracula-fg);
             border-radius: 6px;
             cursor: pointer;
             transition: all 0.2s ease;
@@ -312,9 +333,9 @@
         }
 
         .pagination button:hover:not(:disabled) {
-            background: #4299e1;
-            color: white;
-            border-color: #4299e1;
+            background: var(--dracula-purple);
+            color: var(--dracula-bg);
+            border-color: var(--dracula-purple);
         }
 
         .pagination button:disabled {
@@ -323,9 +344,9 @@
         }
 
         .pagination .current-page {
-            background: #4299e1;
-            color: white;
-            border-color: #4299e1;
+            background: var(--dracula-purple);
+            color: var(--dracula-bg);
+            border-color: var(--dracula-purple);
         }
 
         .stats-row {
@@ -333,27 +354,27 @@
             justify-content: space-between;
             align-items: center;
             padding: 16px 20px;
-            background: #f8f9fa;
-            border-bottom: 1px solid #e2e8f0;
+            background: var(--dracula-selection);
+            border-bottom: 1px solid var(--dracula-current-line);
             font-size: 14px;
-            color: #718096;
+            color: var(--dracula-comment);
         }
 
         .loading {
             text-align: center;
             padding: 40px;
-            color: #666;
+            color: var(--dracula-comment);
             font-size: 18px;
         }
 
         .error {
-            background: #fed7d7;
-            color: #742a2a;
+            background: rgba(255, 85, 85, 0.1);
+            color: var(--dracula-red);
             padding: 16px;
             border-radius: 8px;
             margin: 20px 0;
             text-align: center;
-            border-left: 4px solid #f56565;
+            border-left: 4px solid var(--dracula-red);
         }
 
         /* Modal for image preview */
@@ -395,16 +416,16 @@
         }
 
         .client-selection {
-            background: white;
+            background: var(--dracula-current-line);
             border-radius: 8px;
             padding: 20px;
             margin-bottom: 20px;
-            border: 1px solid #e2e8f0;
-            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+            border: 1px solid var(--dracula-selection);
+            box-shadow: 0 2px 8px rgba(189, 147, 249, 0.2);
         }
 
         .client-selection h2 {
-            color: #2d3748;
+            color: var(--dracula-purple);
             font-size: 1.5rem;
             margin: 0 0 16px 0;
             font-weight: 600;
@@ -418,8 +439,8 @@
         }
 
         .client-card {
-            background: white;
-            border: 2px solid #e2e8f0;
+            background: var(--dracula-bg);
+            border: 2px solid var(--dracula-selection);
             border-radius: 8px;
             padding: 16px;
             cursor: pointer;
@@ -428,20 +449,20 @@
         }
 
         .client-card:hover {
-            border-color: #4299e1;
-            box-shadow: 0 4px 12px rgba(66, 153, 225, 0.1);
+            border-color: var(--dracula-purple);
+            box-shadow: 0 4px 12px rgba(189, 147, 249, 0.3);
             transform: translateY(-2px);
         }
 
         .client-card.selected {
-            border-color: #4299e1;
-            background: #f0f9ff;
+            border-color: var(--dracula-purple);
+            background: rgba(189, 147, 249, 0.1);
         }
 
         .client-name {
             font-size: 1.1rem;
             font-weight: 600;
-            color: #2d3748;
+            color: var(--dracula-cyan);
             margin-bottom: 8px;
         }
 
@@ -450,7 +471,7 @@
             grid-template-columns: 1fr 1fr;
             gap: 8px;
             font-size: 14px;
-            color: #718096;
+            color: var(--dracula-comment);
         }
 
         .client-stat {
@@ -463,19 +484,19 @@
         }
 
         .client-stat-value {
-            color: #4299e1;
+            color: var(--dracula-green);
             font-weight: 600;
         }
 
         .client-last-seen {
             margin-top: 8px;
             font-size: 12px;
-            color: #a0aec0;
+            color: var(--dracula-comment);
         }
 
         .back-to-clients {
-            background: #718096;
-            color: white;
+            background: var(--dracula-comment);
+            color: var(--dracula-fg);
             border: none;
             padding: 8px 16px;
             border-radius: 6px;
@@ -486,22 +507,45 @@
         }
 
         .back-to-clients:hover {
-            background: #4a5568;
+            background: var(--dracula-purple);
+            color: var(--dracula-bg);
+        }
+
+        .today-only-btn {
+            background: var(--dracula-green);
+            color: var(--dracula-bg);
+            border: none;
+            padding: 12px 24px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 500;
+            transition: all 0.2s ease;
+        }
+
+        .today-only-btn:hover {
+            background: var(--dracula-cyan);
+            transform: translateY(-1px);
+        }
+
+        .today-only-btn.active {
+            background: var(--dracula-purple);
+            box-shadow: 0 0 0 3px rgba(189, 147, 249, 0.3);
         }
 
         .selected-client-info {
-            background: #e6fffa;
-            border: 1px solid #81e6d9;
+            background: rgba(139, 233, 253, 0.1);
+            border: 1px solid var(--dracula-cyan);
             border-radius: 6px;
             padding: 12px 16px;
             margin-bottom: 16px;
             font-size: 14px;
-            color: #234e52;
+            color: var(--dracula-fg);
         }
 
         .selected-client-name {
             font-weight: 600;
-            color: #1a202c;
+            color: var(--dracula-cyan);
         }
 
         @media (max-width: 768px) {
@@ -563,9 +607,10 @@
 
         <!-- Observations Section (hidden initially) -->
         <div id="observationsSection" style="display: none;">
-            <div class="selected-client-info">
+            <div class="header">
                 <button class="back-to-clients" onclick="showClientSelection()">← Back to Clients</button>
-                Viewing observations for: <span class="selected-client-name" id="selectedClientName"></span>
+                <h1 id="selectedClientName" style="margin-top: 16px;"></h1>
+                <p>Real-time monitoring of AI detection observations</p>
             </div>
             
             <div class="controls-panel">
@@ -579,6 +624,7 @@
                         <option value="50">50 per page</option>
                         <option value="75">75 per page</option>
                     </select>
+                    <button id="todayOnlyBtn" class="today-only-btn active" onclick="toggleTodayOnly()">📅 Today Only</button>
                     <button class="refresh-btn" onclick="loadObservations()">🔄 Refresh</button>
                 </div>
             
@@ -601,11 +647,7 @@
                     <span>Job ID</span>
                 </label>
                 <label class="column-toggle">
-                    <input type="checkbox" class="column-checkbox" data-column="client_id" checked>
-                    <span>Client</span>
-                </label>
-                <label class="column-toggle">
-                    <input type="checkbox" class="column-checkbox" data-column="stream_id">
+                    <input type="checkbox" class="column-checkbox" data-column="stream_id" checked>
                     <span>Stream</span>
                 </label>
                 <label class="column-toggle">
@@ -679,6 +721,7 @@
         let currentData = null;
         let selectedClientId = null;
         let clientsData = null;
+        let todayOnlyFilter = true; // Default to today only
 
         // Column definitions
         const columns = [
@@ -944,9 +987,25 @@
             });
         }
         
+        function toggleTodayOnly() {
+            todayOnlyFilter = !todayOnlyFilter;
+            const btn = document.getElementById('todayOnlyBtn');
+            
+            if (todayOnlyFilter) {
+                btn.classList.add('active');
+                btn.textContent = '📅 Today Only';
+            } else {
+                btn.classList.remove('active');
+                btn.textContent = '📅 All Dates';
+            }
+            
+            currentPage = 1;
+            loadObservations();
+        }
+
         function selectClient(clientId) {
             selectedClientId = clientId;
-            document.getElementById('selectedClientName').textContent = clientId;
+            document.getElementById('selectedClientName').textContent = '🔍 Observations - ' + clientId;
             
             // Hide client selection and show observations section
             document.getElementById('clientSelection').style.display = 'none';
@@ -988,9 +1047,20 @@
                 order: currentOrder
             });
             
-            // Add client filter to search
-            const clientSearch = `client_id:${selectedClientId}`;
-            const fullSearch = currentSearch ? `${currentSearch} ${clientSearch}` : clientSearch;
+            // Add client filter and today filter to search
+            let searchFilters = [`client_id:${selectedClientId}`];
+            
+            if (todayOnlyFilter) {
+                const today = new Date();
+                const startOfDay = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+                const endOfDay = new Date(today.getFullYear(), today.getMonth(), today.getDate() + 1);
+                
+                // Format as ISO string and add to search
+                const todayFilter = `created_at:>=${startOfDay.toISOString()}`;
+                searchFilters.push(todayFilter);
+            }
+            
+            const fullSearch = currentSearch ? `${currentSearch} ${searchFilters.join(' ')}` : searchFilters.join(' ');
             params.set('search', fullSearch);
             
             fetch(`/api/observations?${params}`)
