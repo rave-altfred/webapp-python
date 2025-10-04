@@ -1314,6 +1314,7 @@ def api_observations():
         
         if search:
             # Parse search string for special filters
+            logger.info(f"🔍 Parsing search string: {search}")
             parts = search.split()
             client_filter = None
             date_filter = None
@@ -1325,6 +1326,7 @@ def api_observations():
                 elif part.startswith('created_at:>='):
                     # Extract date from created_at:>=ISO_DATE
                     date_filter = part.replace('created_at:>=', '').strip()
+                    logger.info(f"📅 Date filter extracted: {date_filter}")
                 else:
                     search_terms.append(part)
             
@@ -1332,11 +1334,13 @@ def api_observations():
             if client_filter:
                 where_conditions.append("client_id = %s")
                 params.append(client_filter)
+                logger.info(f"👤 Client filter: {client_filter}")
             
             # Add date filter
             if date_filter:
                 where_conditions.append("created_at >= %s")
                 params.append(date_filter)
+                logger.info(f"📅 Applied date filter: created_at >= {date_filter}")
             
             # Add text search if there are search terms
             if search_terms:

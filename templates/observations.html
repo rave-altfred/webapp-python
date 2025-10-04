@@ -1051,12 +1051,13 @@
             let searchFilters = [`client_id:${selectedClientId}`];
             
             if (todayOnlyFilter) {
-                const today = new Date();
-                const startOfDay = new Date(today.getFullYear(), today.getMonth(), today.getDate());
-                const endOfDay = new Date(today.getFullYear(), today.getMonth(), today.getDate() + 1);
+                // Get start of today in UTC
+                const now = new Date();
+                const startOfDayUTC = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(), 0, 0, 0, 0));
                 
                 // Format as ISO string and add to search
-                const todayFilter = `created_at:>=${startOfDay.toISOString()}`;
+                const todayFilter = `created_at:>=${startOfDayUTC.toISOString()}`;
+                console.log('Today filter:', todayFilter);
                 searchFilters.push(todayFilter);
             }
             
